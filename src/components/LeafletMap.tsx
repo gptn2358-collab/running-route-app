@@ -196,10 +196,14 @@ window.addEventListener('load', function() {
   }).addTo(map);
 
   // ── 화장실 안내 ──────────────────────────────────────────────────
-  var wcLine = L.polyline([], {color:'#FF9500', weight:5, dashArray:'10 6'}).addTo(map);
+  var wcLine = L.polyline([], {color:'#FF9500', weight:6, dashArray:'12 7', opacity:0.95}).addTo(map);
   var wcMarker = null;
+  var wcDest = null;     // 화장실 목적지 좌표 [lat, lon]
+  var bathroomActive = false;
 
   window.showBathroom = function(lat, lon, route) {
+    wcDest = [lat, lon];
+    bathroomActive = true;
     wcLine.setLatLngs(route);
     if (wcMarker) map.removeLayer(wcMarker);
     var icon = L.divIcon({
@@ -208,12 +212,17 @@ window.addEventListener('load', function() {
       iconSize:[34,34], iconAnchor:[17,17]
     });
     wcMarker = L.marker([lat,lon], {icon:icon, zIndexOffset:900}).addTo(map);
+    // 러너 현재 위치와 화장실을 모두 포함하는 뷰로 즉시 전환
     if (route.length > 1) {
-      map.fitBounds(L.polyline(route).getBounds(), {padding:[60,60], animate:true});
+      map.fitBounds(L.polyline(route).getBounds(), {
+        padding:[70,70], animate:false
+      });
     }
   };
 
   window.clearBathroom = function() {
+    bathroomActive = false;
+    wcDest = null;
     wcLine.setLatLngs([]);
     if (wcMarker) { map.removeLayer(wcMarker); wcMarker = null; }
   };
@@ -222,6 +231,15 @@ window.addEventListener('load', function() {
   window.updateRunner = function(lat, lon, trail) {
     runner.setLatLng([lat, lon]);
     trailLine.setLatLngs(trail);
+
+    if (bathroomActive && wcDest) {
+      // 화장실 모드: 러너와 화장실이 모두 보이도록 뷰 유지
+      // panTo 하지 않고 fitBounds로 두 지점이 항상 화면 안에 오도록 함
+      var bounds = L.latLngBounds([[lat, lon], wcDest]);
+      map.fitBounds(bounds, {padding:[80,80], animate:true, maxZoom:17});
+      return; // 경로 진행 분할 로직 스킵
+    }
+
     map.panTo([lat, lon], {animate:true, duration:0.5});
 
     // 현재 위치에서 앞쪽으로만 탐색해 가장 가까운 경로 점 찾기
