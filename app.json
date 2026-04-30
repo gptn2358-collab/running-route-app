@@ -1,0 +1,46 @@
+{
+  "expo": {
+    "name": "달리기 경로",
+    "slug": "running-route-app",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
+    "splash": {
+      "backgroundColor": "#0f0f0f"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.yourname.runningrouteapp",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "달리기 경로 탐색 및 GPS 트래킹을 위해 위치 정보가 필요합니다.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "달리는 동안 경로 트래킹을 위해 위치 정보가 필요합니다.",
+        "NSAppTransportSecurity": {
+          "NSExceptionDomains": {
+            "t-data.seoul.go.kr": {
+              "NSExceptionAllowsInsecureHTTPLoads": true,
+              "NSIncludesSubdomains": true
+            }
+          }
+        }
+      }
+    },
+    "android": {
+      "package": "com.yourname.runningrouteapp",
+      "adaptiveIcon": {
+        "backgroundColor": "#0f0f0f"
+      },
+      "permissions": [
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_BACKGROUND_LOCATION"
+      ],
+      "config": {
+        "googleMaps": {
+          "apiKey": "YOUR_GOOGLE_MAPS_API_KEY_HERE"
+        }
+      },
+      "usesCleartextTraffic": true
+    }
+  }
+}
