@@ -1,8 +1,6 @@
-import * as FileSystem from 'expo-file-system';
+import { File, Paths } from 'expo-file-system';
 import { RouteReview, RouteCandidate, Coordinate } from '../types';
 import { isNearPolyline } from '../utils/geoUtils';
-
-const REVIEW_FILE = FileSystem.documentDirectory + 'route_reviews.json';
 
 const ISSUE_PROXIMITY_M = 80;
 const ROUTE_OVERLAP_PROXIMITY_M = 50;
@@ -18,17 +16,19 @@ const ISSUE_SEVERITY: Record<string, number> = {
 // ─── Storage ────────────────────────────────────────────────────
 
 export async function saveReview(review: RouteReview): Promise<void> {
+  const file = new File(Paths.document, 'route_reviews.json');
   const all = await loadReviews();
   all.push(review);
-  await FileSystem.writeAsStringAsync(REVIEW_FILE, JSON.stringify(all));
+  file.write(JSON.stringify(all));
 }
 
 export async function loadReviews(): Promise<RouteReview[]> {
   try {
-    const info = await FileSystem.getInfoAsync(REVIEW_FILE);
-    if (!info.exists) return [];
-    const raw = await FileSystem.readAsStringAsync(REVIEW_FILE);
-    return JSON.parse(raw) as RouteReview[];
+    const file = new File(Paths.document, 'route_reviews.json');
+    if (!file.exists) return [];
+    const raw = await file.text();
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? (parsed as RouteReview[]) : [];
   } catch {
     return [];
   }
