@@ -272,18 +272,15 @@ export async function generateBestRoutes(
     throw new Error('경로를 찾을 수 없습니다.\n인터넷 연결을 확인하고 다시 시도해주세요.');
   }
 
-  // Each unit of penalty ≈ 0.6 equivalent traffic signals when sorting.
-  // This lets a slightly longer route beat a reviewed-bad one.
   const PENALTY_WEIGHT = 0.6;
   finalCandidates.sort((a, b) => {
+    const distDiff =
+      Math.abs(a.distance - targetDistanceM) -
+      Math.abs(b.distance - targetDistanceM);
+    if (Math.abs(distDiff) > 10) return distDiff;
     const scoreA = a.trafficSignals + scoreRouteWithReviews(a, reviews) * PENALTY_WEIGHT;
     const scoreB = b.trafficSignals + scoreRouteWithReviews(b, reviews) * PENALTY_WEIGHT;
-    const dScore = scoreA - scoreB;
-    if (Math.abs(dScore) > 0.5) return dScore;
-    return (
-      Math.abs(a.distance - targetDistanceM) -
-      Math.abs(b.distance - targetDistanceM)
-    );
+    return scoreA - scoreB;
   });
 
   return finalCandidates;

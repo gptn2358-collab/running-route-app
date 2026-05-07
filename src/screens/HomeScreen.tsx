@@ -15,6 +15,7 @@ import { Coordinate } from '../types';
 import WebMapView, { WebMapViewHandle } from '../components/WebMapView';
 
 const PRESET_KM = [3, 5, 10, 15, 21];
+const PRESET_LABELS: Record<number, string> = { 21: '하프 마라톤' };
 
 const SEOUL: Coordinate = { latitude: 37.5665, longitude: 126.978 };
 
@@ -110,7 +111,7 @@ export default function HomeScreen({ onSearch, onRanking, onProfile }: Props) {
                 onPress={() => { setSelectedKm(km); setCustomKm(''); }}
               >
                 <Text style={[s.presetBtnTxt, active && s.presetBtnTxtOn]}>
-                  {km}km
+                  {PRESET_LABELS[km] ?? `${km}km`}
                 </Text>
               </TouchableOpacity>
             );
