@@ -216,15 +216,25 @@ window.addEventListener('load', function() {
     });
 
     // ── 중간 지점에 방향 화살표 마커 ─────────────────────────────
+    // 화살표를 놓을 위치(midIdx)에서의 로컬 방위각 계산 — 시작 방위각 대신
+    // 로컬 방위각을 사용해야 경로가 꺾일 때도 도로 방향과 일치함
     var midIdx = Math.max(1, Math.floor(seg.length / 2));
+    var aFrom = seg[Math.max(0, midIdx - 1)];
+    var aTo   = seg[Math.min(seg.length - 1, midIdx + 1)];
+    var aDLonR = (aTo[1] - aFrom[1]) * Math.PI / 180;
+    var aLat1r = aFrom[0] * Math.PI / 180, aLat2r = aTo[0] * Math.PI / 180;
+    var aYY = Math.sin(aDLonR) * Math.cos(aLat2r);
+    var aXX = Math.cos(aLat1r) * Math.sin(aLat2r) - Math.sin(aLat1r) * Math.cos(aLat2r) * Math.cos(aDLonR);
+    var localBearing = (Math.atan2(aYY, aXX) * 180 / Math.PI + 360) % 360;
+
     var arrowHtml =
       '<div style="'
       + 'width:0;height:0;'
       + 'border-left:11px solid transparent;'
       + 'border-right:11px solid transparent;'
       + 'border-bottom:24px solid #2979FF;'
-      + 'transform:rotate(' + bearing + 'deg);'
-      + 'transform-origin:50% 67%;'
+      + 'transform:rotate(' + localBearing + 'deg);'
+      + 'transform-origin:50% 50%;'
       + 'filter:drop-shadow(0 0 3px white) drop-shadow(0 0 3px white);'
       + '"></div>';
 

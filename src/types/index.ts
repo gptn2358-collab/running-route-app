@@ -48,6 +48,8 @@ export interface MonthlyRanking {
   month: string;
   longRunner: RankingEntry[];
   offRunner: RankingEntry[];
+  myLongRank: { rank: number; valueKm: number } | null;
+  myOffRank:  { rank: number; valueKm: number } | null;
 }
 
 export type IssueType = 'road' | 'safety' | 'traffic' | 'lighting' | 'other';

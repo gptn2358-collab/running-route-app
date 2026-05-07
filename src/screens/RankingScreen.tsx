@@ -61,6 +61,10 @@ export default function RankingScreen({ profile, onBack, onSetupProfile }: Props
     ? (tab === 'long' ? ranking.longRunner : ranking.offRunner)
     : [];
 
+  const myRank = ranking
+    ? (tab === 'long' ? ranking.myLongRank : ranking.myOffRank)
+    : null;
+
   const topEntry = entries[0] ?? null;
 
   return (
@@ -161,9 +165,18 @@ export default function RankingScreen({ profile, onBack, onSetupProfile }: Props
         {/* Current user position if not in top 10 */}
         {profile?.optedInRanking && ranking && !entries.some(e => e.isCurrentUser) && (
           <View style={s.myPositionCard}>
-            <Text style={s.myPositionTxt}>
-              아직 이달의 기록이 없습니다.{'\n'}달리기를 완료하면 랭킹에 반영됩니다!
-            </Text>
+            {myRank ? (
+              <>
+                <Text style={s.myPositionLabel}>내 순위</Text>
+                <Text style={s.myPositionRank}>{myRank.rank}위</Text>
+                <Text style={s.myPositionKm}>{myRank.valueKm.toFixed(1)} km</Text>
+                <Text style={s.myPositionHint}>TOP 10까지 달려보세요!</Text>
+              </>
+            ) : (
+              <Text style={s.myPositionTxt}>
+                아직 이달의 기록이 없습니다.{'\n'}달리기를 완료하면 랭킹에 반영됩니다!
+              </Text>
+            )}
           </View>
         )}
       </ScrollView>
@@ -315,7 +328,13 @@ const s = StyleSheet.create({
     borderRadius: 16,
     padding: 20,
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#2a2a2a',
   },
+  myPositionLabel: { color: '#666', fontSize: 12, fontWeight: '600', marginBottom: 4 },
+  myPositionRank: { color: '#00C853', fontSize: 32, fontWeight: '800' },
+  myPositionKm: { color: '#aaa', fontSize: 16, fontWeight: '600', marginTop: 2, marginBottom: 8 },
+  myPositionHint: { color: '#555', fontSize: 12 },
   myPositionTxt: {
     color: '#555',
     fontSize: 13,
