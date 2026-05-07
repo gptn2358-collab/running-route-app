@@ -7,15 +7,17 @@ import {
   Platform,
   ScrollView,
 } from 'react-native';
-import { RunStats } from '../types';
+import { RunStats, UserProfile } from '../types';
 
 interface Props {
   stats: RunStats;
+  profile: UserProfile | null;
   onHome: () => void;
   onReview: () => void;
+  onRanking: () => void;
 }
 
-export default function SummaryScreen({ stats, onHome, onReview }: Props) {
+export default function SummaryScreen({ stats, profile, onHome, onReview, onRanking }: Props) {
   const { distance, duration } = stats;
 
   const km = distance / 1000;
@@ -84,8 +86,18 @@ export default function SummaryScreen({ stats, onHome, onReview }: Props) {
         </View>
       </View>
 
+      {profile?.optedInRanking && (
+        <View style={s.rankingBadge}>
+          <Text style={s.rankingBadgeTxt}>🏆 달리기 기록이 이달 랭킹에 반영됩니다</Text>
+        </View>
+      )}
+
       <TouchableOpacity style={s.reviewBtn} onPress={onReview}>
         <Text style={s.reviewBtnTxt}>📝  코스 리뷰 남기기</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity style={s.rankingBtn} onPress={onRanking}>
+        <Text style={s.rankingBtnTxt}>🏆  이달 랭킹 보기</Text>
       </TouchableOpacity>
 
       <TouchableOpacity style={s.homeBtn} onPress={onHome}>
@@ -130,6 +142,17 @@ const s = StyleSheet.create({
   lbl: { color: '#666', fontSize: 12, marginTop: 4 },
   vDiv: { width: 1, backgroundColor: '#2a2a2a' },
   hDiv: { height: 1, backgroundColor: '#2a2a2a', marginVertical: 6 },
+  rankingBadge: {
+    backgroundColor: '#0d2818',
+    borderRadius: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    alignItems: 'center',
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#1a4a2a',
+  },
+  rankingBadgeTxt: { color: '#00C853', fontSize: 12, fontWeight: '600' },
   reviewBtn: {
     backgroundColor: '#1e1e1e',
     borderRadius: 14,
@@ -140,6 +163,16 @@ const s = StyleSheet.create({
     borderColor: '#2979FF',
   },
   reviewBtnTxt: { color: '#2979FF', fontSize: 15, fontWeight: '700' },
+  rankingBtn: {
+    backgroundColor: '#1e1e1e',
+    borderRadius: 14,
+    paddingVertical: 16,
+    alignItems: 'center',
+    marginBottom: 10,
+    borderWidth: 1.5,
+    borderColor: '#FFD60A',
+  },
+  rankingBtnTxt: { color: '#FFD60A', fontSize: 15, fontWeight: '700' },
   homeBtn: {
     backgroundColor: '#00C853',
     borderRadius: 14,

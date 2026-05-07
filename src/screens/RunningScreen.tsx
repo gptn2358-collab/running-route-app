@@ -321,6 +321,7 @@ export default function RunningScreen({ route: initialRoute, start, onFinish }: 
           locSub.current?.remove();
           if (timerRef.current) clearInterval(timerRef.current);
           onFinish({
+            id: Date.now().toString(),
             distance: coveredMRef.current,
             duration: elapsed,
             trail: trailRef.current,

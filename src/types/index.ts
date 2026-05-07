@@ -14,10 +14,40 @@ export interface RouteCandidate {
 }
 
 export interface RunStats {
+  id: string;             // unique run identifier (used for ranking dedup)
   distance: number;       // meters covered
   duration: number;       // seconds elapsed
   trail: Coordinate[];    // actual GPS path taken
   routePolyline: Coordinate[]; // planned route polyline
+}
+
+export interface UserProfile {
+  id: string;
+  nickname: string;
+  optedInRanking: boolean;
+}
+
+export interface RunRecord {
+  runId: string;
+  userId: string;
+  nickname: string;
+  month: string;          // 'YYYY-MM'
+  distanceM: number;
+  isOffRun: boolean;
+  submittedAt: string;    // ISO
+}
+
+export interface RankingEntry {
+  rank: number;
+  nickname: string;
+  valueKm: number;
+  isCurrentUser: boolean;
+}
+
+export interface MonthlyRanking {
+  month: string;
+  longRunner: RankingEntry[];
+  offRunner: RankingEntry[];
 }
 
 export type IssueType = 'road' | 'safety' | 'traffic' | 'lighting' | 'other';

@@ -39,11 +39,12 @@ interface Props {
   trail: Coordinate[];
   routePolyline: Coordinate[];
   onDone: () => void;
+  onReviewSubmitted?: (review: RouteReview) => void;
 }
 
 // ─── Component ───────────────────────────────────────────────────
 
-export default function ReviewScreen({ trail, routePolyline, onDone }: Props) {
+export default function ReviewScreen({ trail, routePolyline, onDone, onReviewSubmitted }: Props) {
   const [step, setStep]                 = useState<Step>('initial');
   const [issues, setIssues]             = useState<RouteIssue[]>([]);
   const [pendingCoord, setPendingCoord] = useState<Coordinate | null>(null);
@@ -106,6 +107,7 @@ export default function ReviewScreen({ trail, routePolyline, onDone }: Props) {
         issues,
       };
       await saveReview(review);
+      onReviewSubmitted?.(review);
       onDone();
     } catch (e) {
       console.error('[ReviewScreen] saveReview failed:', e);

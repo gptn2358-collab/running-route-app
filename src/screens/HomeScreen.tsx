@@ -20,9 +20,11 @@ const SEOUL: Coordinate = { latitude: 37.5665, longitude: 126.978 };
 
 interface Props {
   onSearch: (start: Coordinate, distanceM: number) => Promise<void>;
+  onRanking: () => void;
+  onProfile: () => void;
 }
 
-export default function HomeScreen({ onSearch }: Props) {
+export default function HomeScreen({ onSearch, onRanking, onProfile }: Props) {
   const [location, setLocation] = useState<Coordinate | null>(null);
   const [selectedKm, setSelectedKm] = useState(5);
   const [customKm, setCustomKm] = useState('');
@@ -82,8 +84,20 @@ export default function HomeScreen({ onSearch }: Props) {
       <WebMapView ref={mapRef} center={SEOUL} zoom={13} style={s.map} />
 
       <View style={s.panel}>
-        <Text style={s.title}>달리기 경로 탐색</Text>
-        <Text style={s.subtitle}>신호등을 최소화한 순환 경로를 찾아드립니다 🏃</Text>
+        <View style={s.titleRow}>
+          <View style={s.titleBlock}>
+            <Text style={s.title}>달리기 경로 탐색</Text>
+            <Text style={s.subtitle}>신호등을 최소화한 순환 경로를 찾아드립니다 🏃</Text>
+          </View>
+          <View style={s.quickBtns}>
+            <TouchableOpacity style={s.quickBtn} onPress={onRanking}>
+              <Text style={s.quickBtnTxt}>🏆</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={s.quickBtn} onPress={onProfile}>
+              <Text style={s.quickBtnTxt}>👤</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
 
         <Text style={s.sectionLabel}>목표 거리</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.presetScroll}>
@@ -149,8 +163,25 @@ const s = StyleSheet.create({
     padding: 20,
     paddingBottom: Platform.OS === 'ios' ? 36 : 20,
   },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  titleBlock: { flex: 1 },
   title: { color: '#fff', fontSize: 20, fontWeight: '700', marginBottom: 4 },
-  subtitle: { color: '#777', fontSize: 13, marginBottom: 16 },
+  subtitle: { color: '#777', fontSize: 13 },
+  quickBtns: { flexDirection: 'row', gap: 8, marginLeft: 12 },
+  quickBtn: {
+    width: 38,
+    height: 38,
+    backgroundColor: '#2a2a2a',
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  quickBtnTxt: { fontSize: 18 },
   sectionLabel: { color: '#aaa', fontSize: 13, marginBottom: 8 },
   presetScroll: { marginBottom: 10 },
   presetBtn: {
