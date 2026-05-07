@@ -107,7 +107,8 @@ export default function ReviewScreen({ trail, routePolyline, onDone }: Props) {
       };
       await saveReview(review);
       onDone();
-    } catch {
+    } catch (e) {
+      console.error('[ReviewScreen] saveReview failed:', e);
       Alert.alert('저장 오류', '리뷰 저장에 실패했습니다. 다시 시도해주세요.');
     } finally {
       setSubmitting(false);
