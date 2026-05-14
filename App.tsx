@@ -165,7 +165,7 @@ export default function App() {
     return (
       <SafeAreaProvider>
         <StatusBar style="light" />
-        <HomeScreen onSearch={handleSearch} />
+        <HomeScreen onSearch={handleSearch} onBack={handleHome} />
       </SafeAreaProvider>
     );
   }

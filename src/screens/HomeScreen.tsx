@@ -21,9 +21,10 @@ const SEOUL: Coordinate = { latitude: 37.5665, longitude: 126.978 };
 
 interface Props {
   onSearch: (start: Coordinate, distanceM: number) => Promise<void>;
+  onBack?: () => void;
 }
 
-export default function HomeScreen({ onSearch }: Props) {
+export default function HomeScreen({ onSearch, onBack }: Props) {
   const [location, setLocation] = useState<Coordinate | null>(null);
   const [selectedKm, setSelectedKm] = useState(5);
   const [customKm, setCustomKm] = useState('');
@@ -81,6 +82,12 @@ export default function HomeScreen({ onSearch }: Props) {
   return (
     <View style={s.container}>
       <WebMapView ref={mapRef} center={SEOUL} zoom={13} style={s.map} />
+
+      {onBack && (
+        <TouchableOpacity style={s.backBtn} onPress={onBack}>
+          <Text style={s.backBtnTxt}>← 뒤로</Text>
+        </TouchableOpacity>
+      )}
 
       <View style={s.panel}>
         <View style={s.titleRow}>
@@ -146,6 +153,16 @@ export default function HomeScreen({ onSearch }: Props) {
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0f0f0f' },
   map: { flex: 1 },
+  backBtn: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 58 : 20,
+    left: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderRadius: 22,
+    backgroundColor: 'rgba(0,0,0,0.72)',
+  },
+  backBtnTxt: { color: '#fff', fontSize: 14, fontWeight: '600' },
   panel: {
     backgroundColor: '#1a1a1a',
     borderTopLeftRadius: 22,
