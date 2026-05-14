@@ -13,12 +13,20 @@ export interface RouteCandidate {
   trafficSignalLocations: Coordinate[];
 }
 
+export interface RunSegment {
+  km: number;                  // which km (1 = first km complete)
+  cumulativeDistanceM: number;
+  cumulativeDurationS: number;
+  paceSecPerKm: number;        // seconds per km for this segment
+}
+
 export interface RunStats {
   id: string;             // unique run identifier (used for ranking dedup)
   distance: number;       // meters covered
   duration: number;       // seconds elapsed
   trail: Coordinate[];    // actual GPS path taken
   routePolyline: Coordinate[]; // planned route polyline
+  segments: RunSegment[]; // per-km pace breakdown
 }
 
 export interface UserProfile {
