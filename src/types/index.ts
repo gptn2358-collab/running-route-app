@@ -33,6 +33,7 @@ export interface RunRecord {
   nickname: string;
   month: string;          // 'YYYY-MM'
   distanceM: number;
+  durationS: number;      // seconds
   isOffRun: boolean;
   submittedAt: string;    // ISO
 }

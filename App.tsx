@@ -3,45 +3,56 @@ import { View, Text, ActivityIndicator, StyleSheet } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 
-import HomeScreen from './src/screens/HomeScreen';
-import RoutePreviewScreen from './src/screens/RoutePreviewScreen';
-import RunningScreen from './src/screens/RunningScreen';
-import SummaryScreen from './src/screens/SummaryScreen';
-import ReviewScreen from './src/screens/ReviewScreen';
-import RankingScreen from './src/screens/RankingScreen';
-import ProfileSetupScreen from './src/screens/ProfileSetupScreen';
+// ── 탭 화면 ──────────────────────────────────────────────────────
+import MainHomeScreen    from './src/screens/MainHomeScreen';
+import RunHistoryScreen  from './src/screens/RunHistoryScreen';
+import RankingScreen     from './src/screens/RankingScreen';
+import MyPageScreen      from './src/screens/MyPageScreen';
 
-import { generateBestRoutes } from './src/services/routingService';
-import { loadProfile, saveProfile } from './src/services/userService';
-import { submitRunRecord, getMonthKey } from './src/services/rankingService';
+// ── 달리기 플로우 화면 ────────────────────────────────────────────
+import HomeScreen        from './src/screens/HomeScreen';
+import RoutePreviewScreen from './src/screens/RoutePreviewScreen';
+import RunningScreen     from './src/screens/RunningScreen';
+import SummaryScreen     from './src/screens/SummaryScreen';
+import ReviewScreen      from './src/screens/ReviewScreen';
+
+// ── 기타 ─────────────────────────────────────────────────────────
+import ProfileSetupScreen from './src/screens/ProfileSetupScreen';
+import BottomTabBar, { TabKey } from './src/components/BottomTabBar';
+
+import { generateBestRoutes }             from './src/services/routingService';
+import { loadProfile, saveProfile }       from './src/services/userService';
+import { submitRunRecord, getMonthKey }   from './src/services/rankingService';
 import {
-  Coordinate,
-  RouteCandidate,
-  RunStats,
-  RouteReview,
-  UserProfile,
-  RunRecord,
+  Coordinate, RouteCandidate, RunStats, RouteReview,
+  UserProfile, RunRecord,
 } from './src/types';
 
-type Screen = 'home' | 'preview' | 'running' | 'summary' | 'review' | 'ranking' | 'profile-setup';
+// 달리기 플로우 단계 (null이면 탭 내비게이터 표시)
+type RunFlow = 'selecting' | 'preview' | 'running' | 'summary' | 'review';
 
 export default function App() {
-  const [screen, setScreen] = useState<Screen>('home');
-  const [loading, setLoading] = useState(false);
+  // ── 탭 상태 ────────────────────────────────────────────────────
+  const [activeTab,  setActiveTab]  = useState<TabKey>('home');
+
+  // ── 달리기 플로우 상태 ──────────────────────────────────────────
+  const [runFlow,    setRunFlow]    = useState<RunFlow | null>(null);
+  const [loading,    setLoading]    = useState(false);
   const [loadingMsg, setLoadingMsg] = useState('');
 
-  const [startCoord, setStartCoord] = useState<Coordinate | null>(null);
-  const [routes, setRoutes] = useState<RouteCandidate[]>([]);
+  // ── 달리기 데이터 ───────────────────────────────────────────────
+  const [startCoord,  setStartCoord]  = useState<Coordinate | null>(null);
+  const [routes,      setRoutes]      = useState<RouteCandidate[]>([]);
   const [activeRoute, setActiveRoute] = useState<RouteCandidate | null>(null);
-  const [runStats, setRunStats] = useState<RunStats | null>(null);
-  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [runStats,    setRunStats]    = useState<RunStats | null>(null);
 
-  // Load user profile on startup
-  useEffect(() => {
-    loadProfile().then(p => setProfile(p));
-  }, []);
+  // ── 프로필 ─────────────────────────────────────────────────────
+  const [profile,         setProfile]         = useState<UserProfile | null>(null);
+  const [showProfileSetup, setShowProfileSetup] = useState(false);
 
-  // ── Route search ───────────────────────────────────────────────
+  useEffect(() => { loadProfile().then(p => setProfile(p)); }, []);
+
+  // ── 경로 탐색 ──────────────────────────────────────────────────
 
   async function handleSearch(start: Coordinate, distanceM: number) {
     setLoading(true);
@@ -52,7 +63,7 @@ export default function App() {
       const candidates = await generateBestRoutes(start, distanceM);
       clearTimeout(timer);
       setRoutes(candidates);
-      setScreen('preview');
+      setRunFlow('preview');
     } finally {
       setLoading(false);
       setLoadingMsg('');
@@ -61,24 +72,24 @@ export default function App() {
 
   function handleStartRun(route: RouteCandidate) {
     setActiveRoute(route);
-    setScreen('running');
+    setRunFlow('running');
   }
 
-  // ── Run finish & ranking submission ────────────────────────────
+  // ── 달리기 종료 & 랭킹 제출 ─────────────────────────────────────
 
   function handleFinish(stats: RunStats) {
     setRunStats(stats);
-    setScreen('summary');
-    // Submit long-runner record if opted in (isOffRun defaults to false;
-    // updated to true if the user later reviews with issues)
+    setRunFlow('summary');
+
     if (profile?.optedInRanking) {
       const record: RunRecord = {
-        runId: stats.id,
-        userId: profile.id,
-        nickname: profile.nickname,
-        month: getMonthKey(),
-        distanceM: stats.distance,
-        isOffRun: false,
+        runId:       stats.id,
+        userId:      profile.id,
+        nickname:    profile.nickname,
+        month:       getMonthKey(),
+        distanceM:   stats.distance,
+        durationS:   stats.duration,
+        isOffRun:    false,
         submittedAt: new Date().toISOString(),
       };
       submitRunRecord(record);
@@ -89,56 +100,36 @@ export default function App() {
     if (!profile?.optedInRanking || !runStats) return;
     const isOffRun = review.hasIssues || review.rating <= 2;
     if (!isOffRun) return;
-    // Update the existing record to mark this run as off-run
     const record: RunRecord = {
-      runId: runStats.id,
-      userId: profile.id,
-      nickname: profile.nickname,
-      month: getMonthKey(),
-      distanceM: runStats.distance,
-      isOffRun: true,
+      runId:       runStats.id,
+      userId:      profile.id,
+      nickname:    profile.nickname,
+      month:       getMonthKey(),
+      distanceM:   runStats.distance,
+      durationS:   runStats.duration,
+      isOffRun:    true,
       submittedAt: new Date().toISOString(),
     };
     submitRunRecord(record);
   }
 
-  // ── Navigation ─────────────────────────────────────────────────
-
-  function handleReview() {
-    setScreen('review');
-  }
+  // ── 네비게이션 핸들러 ───────────────────────────────────────────
 
   function handleHome() {
-    setScreen('home');
+    setRunFlow(null);
     setRoutes([]);
     setActiveRoute(null);
     setRunStats(null);
-  }
-
-  function handleRanking() {
-    setScreen('ranking');
-  }
-
-  function handleProfileSetup() {
-    setScreen('profile-setup');
+    setActiveTab('home');
   }
 
   async function handleProfileSaved(p: UserProfile) {
     await saveProfile(p);
     setProfile(p);
-    // Return to wherever was appropriate
-    setScreen(runStats ? 'summary' : 'home');
+    setShowProfileSetup(false);
   }
 
-  function handleBackFromProfile() {
-    setScreen(runStats ? 'summary' : 'home');
-  }
-
-  function handleBackFromRanking() {
-    setScreen(runStats ? 'summary' : 'home');
-  }
-
-  // ── Loading overlay ────────────────────────────────────────────
+  // ── 로딩 오버레이 ───────────────────────────────────────────────
 
   if (loading) {
     return (
@@ -153,69 +144,121 @@ export default function App() {
     );
   }
 
-  return (
-    <SafeAreaProvider>
-      <StatusBar style="light" />
+  // ── 프로필 설정 (편집 / 최초 설정) ─────────────────────────────
 
-      {screen === 'home' && (
-        <HomeScreen
-          onSearch={handleSearch}
-          onRanking={handleRanking}
-          onProfile={handleProfileSetup}
+  if (showProfileSetup) {
+    return (
+      <SafeAreaProvider>
+        <StatusBar style="light" />
+        <ProfileSetupScreen
+          existing={profile}
+          onSave={handleProfileSaved}
+          onBack={() => setShowProfileSetup(false)}
         />
-      )}
+      </SafeAreaProvider>
+    );
+  }
 
-      {screen === 'preview' && routes.length > 0 && startCoord && (
+  // ── 달리기 플로우 (탭바 없음) ───────────────────────────────────
+
+  if (runFlow === 'selecting') {
+    return (
+      <SafeAreaProvider>
+        <StatusBar style="light" />
+        <HomeScreen onSearch={handleSearch} />
+      </SafeAreaProvider>
+    );
+  }
+
+  if (runFlow === 'preview' && routes.length > 0 && startCoord) {
+    return (
+      <SafeAreaProvider>
+        <StatusBar style="light" />
         <RoutePreviewScreen
           routes={routes}
           start={startCoord}
           onStart={handleStartRun}
           onBack={handleHome}
         />
-      )}
+      </SafeAreaProvider>
+    );
+  }
 
-      {screen === 'running' && activeRoute && startCoord && (
+  if (runFlow === 'running' && activeRoute && startCoord) {
+    return (
+      <SafeAreaProvider>
+        <StatusBar style="light" />
         <RunningScreen
           route={activeRoute}
           start={startCoord}
           onFinish={handleFinish}
         />
-      )}
+      </SafeAreaProvider>
+    );
+  }
 
-      {screen === 'summary' && runStats && (
+  if (runFlow === 'summary' && runStats) {
+    return (
+      <SafeAreaProvider>
+        <StatusBar style="light" />
         <SummaryScreen
           stats={runStats}
           profile={profile}
           onHome={handleHome}
-          onReview={handleReview}
-          onRanking={handleRanking}
+          onReview={() => setRunFlow('review')}
+          onRanking={() => { handleHome(); setActiveTab('ranking'); }}
         />
-      )}
+      </SafeAreaProvider>
+    );
+  }
 
-      {screen === 'review' && runStats && (
+  if (runFlow === 'review' && runStats) {
+    return (
+      <SafeAreaProvider>
+        <StatusBar style="light" />
         <ReviewScreen
           trail={runStats.trail}
           routePolyline={runStats.routePolyline}
           onDone={handleHome}
           onReviewSubmitted={handleReviewSubmitted}
         />
-      )}
+      </SafeAreaProvider>
+    );
+  }
 
-      {screen === 'ranking' && (
-        <RankingScreen
-          profile={profile}
-          onBack={handleBackFromRanking}
-          onSetupProfile={handleProfileSetup}
-        />
-      )}
+  // ── 탭 네비게이터 (기본 화면) ────────────────────────────────────
 
-      {screen === 'profile-setup' && (
-        <ProfileSetupScreen
-          existing={profile}
-          onSave={handleProfileSaved}
-          onBack={handleBackFromProfile}
-        />
-      )}
+  return (
+    <SafeAreaProvider>
+      <StatusBar style="light" />
+      <View style={s.tabRoot}>
+        <View style={s.tabContent}>
+          {activeTab === 'home' && (
+            <MainHomeScreen
+              profile={profile}
+              onStartRun={() => setRunFlow('selecting')}
+            />
+          )}
+          {activeTab === 'records' && (
+            <RunHistoryScreen profile={profile} />
+          )}
+          {activeTab === 'ranking' && (
+            <RankingScreen
+              profile={profile}
+              onBack={() => setActiveTab('home')}
+              onSetupProfile={() => setShowProfileSetup(true)}
+            />
+          )}
+          {activeTab === 'mypage' && (
+            <MyPageScreen
+              profile={profile}
+              onProfileChange={setProfile}
+              onEditProfile={() => setShowProfileSetup(true)}
+            />
+          )}
+        </View>
+        <BottomTabBar active={activeTab} onChange={setActiveTab} />
+      </View>
     </SafeAreaProvider>
   );
 }
@@ -229,6 +272,9 @@ const s = StyleSheet.create({
     gap: 14,
     padding: 32,
   },
-  loadingTxt: { color: '#fff', fontSize: 17, fontWeight: '600' },
+  loadingTxt:  { color: '#fff', fontSize: 17, fontWeight: '600' },
   loadingHint: { color: '#555', fontSize: 13, textAlign: 'center', lineHeight: 20 },
+
+  tabRoot:    { flex: 1, backgroundColor: '#0f0f0f' },
+  tabContent: { flex: 1 },
 });

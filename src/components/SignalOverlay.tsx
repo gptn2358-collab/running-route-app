@@ -35,7 +35,7 @@ export default function SignalOverlay({ signal, distanceM }: Props) {
     return (
       <View style={s.card}>
         <Text style={s.header}>🚦 V2X 신호</Text>
-        <Text style={s.sub}>신호 정보 분석 중...</Text>
+        <Text style={s.header}>신호 정보 분석 중...</Text>
       </View>
     );
   }

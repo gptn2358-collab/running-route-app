@@ -40,6 +40,16 @@ async function saveLocalRecord(record: RunRecord): Promise<void> {
   recordsFile().write(JSON.stringify(records));
 }
 
+// ─── 사용자 달리기 기록 조회 (RunHistoryScreen / MainHomeScreen 용) ─
+
+export async function getUserRunHistory(userId: string): Promise<RunRecord[]> {
+  const all = await loadLocalRecords();
+  const records = userId
+    ? all.filter(r => r.userId === userId)
+    : all;
+  return records.sort((a, b) => b.submittedAt.localeCompare(a.submittedAt));
+}
+
 // ─── 기록 제출 ────────────────────────────────────────────────────
 //
 //  [Firebase 미설정] 로컬 파일에만 저장
