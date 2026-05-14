@@ -9,7 +9,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import * as Location from 'expo-location';
-import { RouteCandidate, Coordinate, RunStats } from '../types';
+import { RouteCandidate, Coordinate, RunStats, RunSegment } from '../types';
 import { haversineDistance, distToPolyline, predictSignalPhase } from '../utils/geoUtils';
 import {
   fetchSpatData,
@@ -65,6 +65,9 @@ export default function RunningScreen({ route: initialRoute, start, onFinish }: 
   const posRef        = useRef<Coordinate>(start);
   const trailRef      = useRef<Coordinate[]>([start]);
   const coveredMRef   = useRef(0);
+  const elapsedRef    = useRef(0);
+  const segmentsRef   = useRef<RunSegment[]>([]);
+  const lastSegKmRef  = useRef(0);
   const coordMapRef   = useRef<Map<string, { lat: number; lon: number; name: string }> | undefined>(undefined);
   const spatRecordsRef = useRef<IntersectionSignal[]>([]);
   const currentRouteRef = useRef<RouteCandidate>(initialRoute);
@@ -89,7 +92,13 @@ export default function RunningScreen({ route: initialRoute, start, onFinish }: 
     startGPS();
 
     timerRef.current = setInterval(() => {
-      if (!pausedRef.current) setElapsed((e) => e + 1);
+      if (!pausedRef.current) {
+        setElapsed((e) => {
+          const next = e + 1;
+          elapsedRef.current = next;
+          return next;
+        });
+      }
     }, 1000);
 
     getCoordMap().then((map) => {
@@ -237,7 +246,29 @@ export default function RunningScreen({ route: initialRoute, start, onFinish }: 
         const newTrail = [...trailRef.current, newPos];
         trailRef.current = newTrail;
         setTrail(newTrail);
-        setCoveredM((d) => d + delta);
+        const newCovered = coveredMRef.current + delta;
+        coveredMRef.current = newCovered;
+        setCoveredM(newCovered);
+
+        // Record a segment every completed km
+        const completedKm = Math.floor(newCovered / 1000);
+        if (completedKm > lastSegKmRef.current) {
+          for (let km = lastSegKmRef.current + 1; km <= completedKm; km++) {
+            const prevSeg = segmentsRef.current[segmentsRef.current.length - 1];
+            const prevDistM = prevSeg ? prevSeg.cumulativeDistanceM : 0;
+            const prevDurS  = prevSeg ? prevSeg.cumulativeDurationS  : 0;
+            const segDistM  = newCovered - prevDistM;
+            const segDurS   = elapsedRef.current - prevDurS;
+            const pace      = segDistM > 0 ? (segDurS / segDistM) * 1000 : 0;
+            segmentsRef.current = [...segmentsRef.current, {
+              km,
+              cumulativeDistanceM: newCovered,
+              cumulativeDurationS: elapsedRef.current,
+              paceSecPerKm: Math.round(pace),
+            }];
+          }
+          lastSegKmRef.current = completedKm;
+        }
 
         leafletRef.current?.updateRunner(newPos, newTrail);
         updateNearSignal(newPos, spatRecordsRef.current);
@@ -326,6 +357,7 @@ export default function RunningScreen({ route: initialRoute, start, onFinish }: 
             duration: elapsed,
             trail: trailRef.current,
             routePolyline: currentRouteRef.current.polyline,
+            segments: segmentsRef.current,
           });
         },
       },
