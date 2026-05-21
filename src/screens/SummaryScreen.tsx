@@ -13,11 +13,10 @@ interface Props {
   stats: RunStats;
   profile: UserProfile | null;
   onHome: () => void;
-  onReview: () => void;
   onRanking: () => void;
 }
 
-export default function SummaryScreen({ stats, profile, onHome, onReview, onRanking }: Props) {
+export default function SummaryScreen({ stats, profile, onHome, onRanking }: Props) {
   const { distance, duration } = stats;
 
   const km = distance / 1000;
@@ -91,10 +90,6 @@ export default function SummaryScreen({ stats, profile, onHome, onReview, onRank
           <Text style={s.rankingBadgeTxt}>🏆 달리기 기록이 이달 랭킹에 반영됩니다</Text>
         </View>
       )}
-
-      <TouchableOpacity style={s.reviewBtn} onPress={onReview}>
-        <Text style={s.reviewBtnTxt}>📝  코스 리뷰 남기기</Text>
-      </TouchableOpacity>
 
       <TouchableOpacity style={s.rankingBtn} onPress={onRanking}>
         <Text style={s.rankingBtnTxt}>🏆  이달 랭킹 보기</Text>

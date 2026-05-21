@@ -21,8 +21,11 @@ type Tab = 'long' | 'off';
 
 const MEDAL = ['🥇', '🥈', '🥉'];
 
-function RankRow({ entry }: { entry: RankingEntry }) {
+function RankRow({ entry, tab }: { entry: RankingEntry; tab: Tab }) {
   const medal = entry.rank <= 3 ? MEDAL[entry.rank - 1] : null;
+  const valueLabel = tab === 'long'
+    ? `${entry.valueKm.toFixed(1)} km`
+    : `${entry.valueCount}회`;
   return (
     <View style={[s.row, entry.isCurrentUser && s.rowMe]}>
       <View style={s.rankCell}>
@@ -37,7 +40,7 @@ function RankRow({ entry }: { entry: RankingEntry }) {
         {entry.isCurrentUser && <Text style={s.meTag}> 나</Text>}
       </Text>
       <Text style={[s.valueText, entry.isCurrentUser && s.valueMe]}>
-        {entry.valueKm.toFixed(1)} km
+        {valueLabel}
       </Text>
     </View>
   );
@@ -144,7 +147,7 @@ export default function RankingScreen({ profile, onBack, onSetupProfile }: Props
           <Text style={s.empty}>이달 기록이 아직 없습니다</Text>
         ) : (
           <View style={s.listCard}>
-            {entries.map(e => <RankRow key={e.rank} entry={e} />)}
+            {entries.map(e => <RankRow key={e.rank} entry={e} tab={tab} />)}
           </View>
         )}
 
@@ -169,7 +172,11 @@ export default function RankingScreen({ profile, onBack, onSetupProfile }: Props
               <>
                 <Text style={s.myPositionLabel}>내 순위</Text>
                 <Text style={s.myPositionRank}>{myRank.rank}위</Text>
-                <Text style={s.myPositionKm}>{myRank.valueKm.toFixed(1)} km</Text>
+                <Text style={s.myPositionKm}>
+                  {'valueKm' in myRank
+                    ? `${myRank.valueKm.toFixed(1)} km`
+                    : `${myRank.valueCount}회`}
+                </Text>
                 <Text style={s.myPositionHint}>TOP 10까지 달려보세요!</Text>
               </>
             ) : (

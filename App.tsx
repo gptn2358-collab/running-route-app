@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, ActivityIndicator, StyleSheet } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
+import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 
 // ── 탭 화면 ──────────────────────────────────────────────────────
 import MainHomeScreen    from './src/screens/MainHomeScreen';
@@ -10,30 +11,35 @@ import RankingScreen     from './src/screens/RankingScreen';
 import MyPageScreen      from './src/screens/MyPageScreen';
 
 // ── 달리기 플로우 화면 ────────────────────────────────────────────
-import HomeScreen        from './src/screens/HomeScreen';
+import HomeScreen         from './src/screens/HomeScreen';
 import RoutePreviewScreen from './src/screens/RoutePreviewScreen';
-import RunningScreen     from './src/screens/RunningScreen';
-import SummaryScreen     from './src/screens/SummaryScreen';
-import ReviewScreen      from './src/screens/ReviewScreen';
+import RunningScreen      from './src/screens/RunningScreen';
+import ReviewScreen       from './src/screens/ReviewScreen';
+import SummaryScreen      from './src/screens/SummaryScreen';
 
 // ── 기타 ─────────────────────────────────────────────────────────
+import AuthScreen         from './src/screens/AuthScreen';
 import ProfileSetupScreen from './src/screens/ProfileSetupScreen';
 import BottomTabBar, { TabKey } from './src/components/BottomTabBar';
 
-import { generateBestRoutes }             from './src/services/routingService';
-import { loadProfile, saveProfile }       from './src/services/userService';
-import { submitRunRecord, getMonthKey }   from './src/services/rankingService';
+import { generateBestRoutes }                    from './src/services/routingService';
+import { loadProfile, saveProfile }              from './src/services/userService';
+import { submitRunRecord, getMonthKey }          from './src/services/rankingService';
+import { getActiveOffZones, countOffZonesOnRoute } from './src/services/offZoneService';
+import { auth, isFirebaseReady }                 from './src/config/firebase';
 import {
   Coordinate, RouteCandidate, RunStats, RouteReview,
   UserProfile, RunRecord,
 } from './src/types';
 
-// 달리기 플로우 단계 (null이면 탭 내비게이터 표시)
-type RunFlow = 'selecting' | 'preview' | 'running' | 'summary' | 'review';
+type RunFlow = 'selecting' | 'preview' | 'running' | 'review' | 'summary';
 
 export default function App() {
   // ── 탭 상태 ────────────────────────────────────────────────────
-  const [activeTab,  setActiveTab]  = useState<TabKey>('home');
+  const [activeTab, setActiveTab] = useState<TabKey>('home');
+
+  // ── 인증 상태 ───────────────────────────────────────────────────
+  const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null | 'loading'>('loading');
 
   // ── 달리기 플로우 상태 ──────────────────────────────────────────
   const [runFlow,    setRunFlow]    = useState<RunFlow | null>(null);
@@ -47,10 +53,27 @@ export default function App() {
   const [runStats,    setRunStats]    = useState<RunStats | null>(null);
 
   // ── 프로필 ─────────────────────────────────────────────────────
-  const [profile,         setProfile]         = useState<UserProfile | null>(null);
+  const [profile,          setProfile]          = useState<UserProfile | null>(null);
   const [showProfileSetup, setShowProfileSetup] = useState(false);
 
-  useEffect(() => { loadProfile().then(p => setProfile(p)); }, []);
+  // ── Firebase 인증 상태 리스너 ────────────────────────────────────
+
+  useEffect(() => {
+    if (!auth) {
+      setFirebaseUser(null); // 로컬 모드
+      return;
+    }
+    const unsub = onAuthStateChanged(auth, user => setFirebaseUser(user));
+    return unsub;
+  }, []);
+
+  // ── 프로필 로드 (인증 상태 확정 후) ──────────────────────────────
+
+  useEffect(() => {
+    if (firebaseUser === 'loading') return;
+    const uid = (firebaseUser as FirebaseUser | null)?.uid;
+    loadProfile(uid).then(p => setProfile(p));
+  }, [firebaseUser]);
 
   // ── 경로 탐색 ──────────────────────────────────────────────────
 
@@ -75,42 +98,34 @@ export default function App() {
     setRunFlow('running');
   }
 
-  // ── 달리기 종료 & 랭킹 제출 ─────────────────────────────────────
+  // ── 달리기 종료 → 리뷰 화면으로 ───────────────────────────────
 
   function handleFinish(stats: RunStats) {
     setRunStats(stats);
-    setRunFlow('summary');
+    setRunFlow('review'); // 리뷰 먼저, 요약은 리뷰 제출 후
+  }
 
-    if (profile?.optedInRanking) {
+  // ── 리뷰 제출 → 기록 저장 → 요약 화면 ──────────────────────────
+
+  async function handleReviewSubmitted(review: RouteReview) {
+    if (profile?.optedInRanking && runStats) {
+      const offZones = await getActiveOffZones();
+      const offRunCount = countOffZonesOnRoute(runStats.routePolyline, offZones);
+
       const record: RunRecord = {
-        runId:       stats.id,
+        runId:       runStats.id,
         userId:      profile.id,
         nickname:    profile.nickname,
         month:       getMonthKey(),
-        distanceM:   stats.distance,
-        durationS:   stats.duration,
-        isOffRun:    false,
+        distanceM:   runStats.distance,
+        durationS:   runStats.duration,
+        isOffRun:    review.hasIssues || review.rating <= 2,
+        offRunCount,
         submittedAt: new Date().toISOString(),
       };
       submitRunRecord(record);
     }
-  }
-
-  function handleReviewSubmitted(review: RouteReview) {
-    if (!profile?.optedInRanking || !runStats) return;
-    const isOffRun = review.hasIssues || review.rating <= 2;
-    if (!isOffRun) return;
-    const record: RunRecord = {
-      runId:       runStats.id,
-      userId:      profile.id,
-      nickname:    profile.nickname,
-      month:       getMonthKey(),
-      distanceM:   runStats.distance,
-      durationS:   runStats.duration,
-      isOffRun:    true,
-      submittedAt: new Date().toISOString(),
-    };
-    submitRunRecord(record);
+    setRunFlow('summary');
   }
 
   // ── 네비게이션 핸들러 ───────────────────────────────────────────
@@ -144,16 +159,40 @@ export default function App() {
     );
   }
 
+  // ── Firebase Auth 로딩 중 ───────────────────────────────────────
+
+  if (firebaseUser === 'loading') {
+    return (
+      <View style={s.loadingBg}>
+        <StatusBar style="light" />
+        <ActivityIndicator size="large" color="#00C853" />
+      </View>
+    );
+  }
+
+  // ── Firebase 연결됐지만 로그인 안 됨 → 로그인 화면 ───────────────
+
+  if (isFirebaseReady && firebaseUser === null) {
+    return (
+      <SafeAreaProvider>
+        <StatusBar style="light" />
+        <AuthScreen onSuccess={() => {}} />
+      </SafeAreaProvider>
+    );
+  }
+
   // ── 프로필 설정 (편집 / 최초 설정) ─────────────────────────────
 
-  if (showProfileSetup) {
+  if (showProfileSetup || (firebaseUser && !profile)) {
+    const uid = (firebaseUser as FirebaseUser | null)?.uid;
     return (
       <SafeAreaProvider>
         <StatusBar style="light" />
         <ProfileSetupScreen
           existing={profile}
+          defaultUid={uid}
           onSave={handleProfileSaved}
-          onBack={() => setShowProfileSetup(false)}
+          onBack={profile ? () => setShowProfileSetup(false) : undefined}
         />
       </SafeAreaProvider>
     );
@@ -197,6 +236,21 @@ export default function App() {
     );
   }
 
+  if (runFlow === 'review' && runStats) {
+    return (
+      <SafeAreaProvider>
+        <StatusBar style="light" />
+        <ReviewScreen
+          trail={runStats.trail}
+          routePolyline={runStats.routePolyline}
+          userId={profile?.id ?? ''}
+          runId={runStats.id}
+          onReviewSubmitted={handleReviewSubmitted}
+        />
+      </SafeAreaProvider>
+    );
+  }
+
   if (runFlow === 'summary' && runStats) {
     return (
       <SafeAreaProvider>
@@ -205,22 +259,7 @@ export default function App() {
           stats={runStats}
           profile={profile}
           onHome={handleHome}
-          onReview={() => setRunFlow('review')}
           onRanking={() => { handleHome(); setActiveTab('ranking'); }}
-        />
-      </SafeAreaProvider>
-    );
-  }
-
-  if (runFlow === 'review' && runStats) {
-    return (
-      <SafeAreaProvider>
-        <StatusBar style="light" />
-        <ReviewScreen
-          trail={runStats.trail}
-          routePolyline={runStats.routePolyline}
-          onDone={handleHome}
-          onReviewSubmitted={handleReviewSubmitted}
         />
       </SafeAreaProvider>
     );

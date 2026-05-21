@@ -1,5 +1,6 @@
 import { initializeApp, getApps } from 'firebase/app';
 import { getFirestore, Firestore } from 'firebase/firestore';
+import { getAuth, Auth } from 'firebase/auth';
 
 // ─────────────────────────────────────────────────────────────────
 //  Firebase 프로젝트 설정값을 여기에 입력하세요.
@@ -13,23 +14,25 @@ import { getFirestore, Firestore } from 'firebase/firestore';
 // ─────────────────────────────────────────────────────────────────
 
 const FIREBASE_CONFIG = {
-  apiKey:            '',   // ← 붙여넣기
-  authDomain:        '',   // ← 붙여넣기
-  projectId:         '',   // ← 붙여넣기
-  storageBucket:     '',   // ← 붙여넣기
-  messagingSenderId: '',   // ← 붙여넣기
-  appId:             '',   // ← 붙여넣기
+  apiKey:            'AIzaSyAHgAF2AxzcsxcoEq_n9nzKWQiHCdspEWU',
+  authDomain:        'running-application-480c1.firebaseapp.com',
+  projectId:         'running-application-480c1',
+  storageBucket:     'running-application-480c1.firebasestorage.app',
+  messagingSenderId: '796011606914',
+  appId:             '1:796011606914:web:a6a1e6b9e1bc91e629959b',
 };
 
 const isConfigured =
   FIREBASE_CONFIG.apiKey !== '' && FIREBASE_CONFIG.projectId !== '';
 
 export let db: Firestore | null = null;
+export let auth: Auth | null = null;
 
 if (isConfigured) {
   const app = getApps().length ? getApps()[0] : initializeApp(FIREBASE_CONFIG);
   db = getFirestore(app);
-  console.log('[Firebase] Firestore 연결됨 — 실제 멀티유저 랭킹 모드');
+  auth = getAuth(app);
+  console.log('[Firebase] Firestore + Auth 연결됨 — 멀티유저 모드');
 } else {
   console.log('[Firebase] 설정값 없음 — 로컬 모드로 동작');
 }

@@ -13,6 +13,7 @@ import {
 import { Coordinate, IssueType, RouteIssue, RouteReview } from '../types';
 import ReviewMapPicker, { ReviewMapPickerHandle } from '../components/ReviewMapPicker';
 import { saveReview } from '../services/reviewService';
+import { reportDiscomfort } from '../services/offZoneService';
 
 // ─── Constants ───────────────────────────────────────────────────
 
@@ -38,13 +39,14 @@ const RATING_LABELS = ['', '별로예요', '아쉬웠어요', '괜찮았어요',
 interface Props {
   trail: Coordinate[];
   routePolyline: Coordinate[];
-  onDone: () => void;
-  onReviewSubmitted?: (review: RouteReview) => void;
+  userId: string;
+  runId: string;
+  onReviewSubmitted: (review: RouteReview) => void;
 }
 
 // ─── Component ───────────────────────────────────────────────────
 
-export default function ReviewScreen({ trail, routePolyline, onDone, onReviewSubmitted }: Props) {
+export default function ReviewScreen({ trail, routePolyline, userId, runId, onReviewSubmitted }: Props) {
   const [step, setStep]                 = useState<Step>('initial');
   const [issues, setIssues]             = useState<RouteIssue[]>([]);
   const [pendingCoord, setPendingCoord] = useState<Coordinate | null>(null);
@@ -63,7 +65,7 @@ export default function ReviewScreen({ trail, routePolyline, onDone, onReviewSub
   // ── Handlers ─────────────────────────────────────────────────
 
   function handleMapTap(coord: Coordinate) {
-    if (pendingCoord) return; // ignore taps while typing
+    if (pendingCoord) return;
     setPendingCoord(coord);
     setSelectedType(null);
     setNote('');
@@ -109,10 +111,19 @@ export default function ReviewScreen({ trail, routePolyline, onDone, onReviewSub
         issues,
       };
       await saveReview(review);
-      onReviewSubmitted?.(review);
-      onDone();
+
+      // 오프구간 신고 전송 (각 불편사항 좌표마다)
+      if (issues.length > 0 && userId) {
+        await Promise.all(
+          issues.map(issue =>
+            reportDiscomfort(userId, issue.coord, [issue.type], runId)
+          )
+        );
+      }
+
+      onReviewSubmitted(review);
     } catch (e) {
-      console.error('[ReviewScreen] saveReview failed:', e);
+      console.error('[ReviewScreen] 제출 실패:', e);
       Alert.alert('저장 오류', '리뷰 저장에 실패했습니다. 다시 시도해주세요.');
     } finally {
       setSubmitting(false);
@@ -135,10 +146,6 @@ export default function ReviewScreen({ trail, routePolyline, onDone, onReviewSub
         <TouchableOpacity style={s.noBtn} onPress={() => setStep('rating')}>
           <Text style={s.noBtnTxt}>✅  없었어요, 평점만 남기기</Text>
         </TouchableOpacity>
-
-        <TouchableOpacity style={s.skipLink} onPress={onDone}>
-          <Text style={s.skipTxt}>건너뛰기</Text>
-        </TouchableOpacity>
       </View>
     );
   }
@@ -148,7 +155,6 @@ export default function ReviewScreen({ trail, routePolyline, onDone, onReviewSub
   if (step === 'issue-map') {
     return (
       <View style={s.mapScreen}>
-        {/* Map fills entire screen */}
         <ReviewMapPicker
           ref={mapRef}
           trail={trail}
@@ -156,7 +162,6 @@ export default function ReviewScreen({ trail, routePolyline, onDone, onReviewSub
           onTap={handleMapTap}
         />
 
-        {/* Top instruction bar */}
         <View style={s.topBar}>
           <Text style={s.topBarTitle}>
             {pendingCoord
@@ -170,7 +175,6 @@ export default function ReviewScreen({ trail, routePolyline, onDone, onReviewSub
           )}
         </View>
 
-        {/* Issue type panel — slides up when map tapped */}
         {pendingCoord && (
           <KeyboardAvoidingView
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -178,7 +182,6 @@ export default function ReviewScreen({ trail, routePolyline, onDone, onReviewSub
           >
             <Text style={s.issuePanelTitle}>어떤 점이 불편하셨나요?</Text>
 
-            {/* Type selector */}
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
@@ -205,7 +208,6 @@ export default function ReviewScreen({ trail, routePolyline, onDone, onReviewSub
               })}
             </ScrollView>
 
-            {/* Optional note */}
             <TextInput
               style={s.noteInput}
               placeholder="추가 메모 (선택사항)"
@@ -216,7 +218,6 @@ export default function ReviewScreen({ trail, routePolyline, onDone, onReviewSub
               returnKeyType="done"
             />
 
-            {/* Action buttons */}
             <View style={s.panelBtns}>
               <TouchableOpacity style={s.cancelBtn} onPress={handleCancelIssue}>
                 <Text style={s.cancelBtnTxt}>취소</Text>
@@ -232,7 +233,6 @@ export default function ReviewScreen({ trail, routePolyline, onDone, onReviewSub
           </KeyboardAvoidingView>
         )}
 
-        {/* Bottom done bar — visible when not picking a type */}
         {!pendingCoord && (
           <View style={s.bottomBar}>
             <TouchableOpacity style={s.nextBtn} onPress={() => setStep('rating')}>
@@ -260,7 +260,6 @@ export default function ReviewScreen({ trail, routePolyline, onDone, onReviewSub
       <Text style={s.title}>전체 평점</Text>
       <Text style={s.subtitle}>이 코스는 전체적으로 어떠셨나요?</Text>
 
-      {/* Stars */}
       <View style={s.starsRow}>
         {[1, 2, 3, 4, 5].map((star) => (
           <TouchableOpacity key={star} onPress={() => setRating(star)}>
@@ -272,7 +271,6 @@ export default function ReviewScreen({ trail, routePolyline, onDone, onReviewSub
         {rating > 0 ? RATING_LABELS[rating] : '별을 탭하여 평점 선택'}
       </Text>
 
-      {/* Issues summary */}
       {issues.length > 0 && (
         <View style={s.summaryCard}>
           <Text style={s.summaryTitle}>기록된 불편사항 ({issues.length}개)</Text>
@@ -293,7 +291,6 @@ export default function ReviewScreen({ trail, routePolyline, onDone, onReviewSub
         </View>
       )}
 
-      {/* Submit */}
       <TouchableOpacity
         style={[s.submitBtn, (rating === 0 || submitting) && s.submitBtnOff]}
         onPress={handleSubmit}
@@ -303,10 +300,6 @@ export default function ReviewScreen({ trail, routePolyline, onDone, onReviewSub
           {submitting ? '저장 중...' : '리뷰 제출하기'}
         </Text>
       </TouchableOpacity>
-
-      <TouchableOpacity style={s.skipLink} onPress={onDone}>
-        <Text style={s.skipTxt}>건너뛰기</Text>
-      </TouchableOpacity>
     </ScrollView>
   );
 }
@@ -314,7 +307,6 @@ export default function ReviewScreen({ trail, routePolyline, onDone, onReviewSub
 // ─── Styles ──────────────────────────────────────────────────────
 
 const s = StyleSheet.create({
-  // ── Shared ──────────────────────────────────
   bigEmoji: { fontSize: 52, textAlign: 'center', marginBottom: 10 },
   title: {
     color: '#fff',
@@ -329,10 +321,7 @@ const s = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 32,
   },
-  skipLink: { marginTop: 16, alignItems: 'center' },
-  skipTxt: { color: '#555', fontSize: 14 },
 
-  // ── Step 1 (Y/N) ────────────────────────────
   centerScreen: {
     flex: 1,
     backgroundColor: '#0f0f0f',
@@ -360,9 +349,7 @@ const s = StyleSheet.create({
   },
   noBtnTxt: { color: '#00C853', fontSize: 16, fontWeight: '700' },
 
-  // ── Step 2 (Map) ─────────────────────────────
   mapScreen: { flex: 1 },
-
   topBar: {
     position: 'absolute',
     top: Platform.OS === 'ios' ? 58 : 20,
@@ -383,7 +370,6 @@ const s = StyleSheet.create({
     paddingVertical: 4,
   },
   topBadgeTxt: { color: '#00C853', fontSize: 12, fontWeight: '600' },
-
   issuePanel: {
     position: 'absolute',
     bottom: 0,
@@ -397,7 +383,6 @@ const s = StyleSheet.create({
     gap: 12,
   },
   issuePanelTitle: { color: '#fff', fontSize: 16, fontWeight: '700' },
-
   typeScroll: { flexGrow: 0 },
   typeScrollContent: { gap: 8 },
   typeBtn: {
@@ -413,7 +398,6 @@ const s = StyleSheet.create({
   typeBtnIcon: { fontSize: 18, marginBottom: 3 },
   typeBtnLbl: { color: '#aaa', fontSize: 11, fontWeight: '600' },
   typeBtnLblOn: { color: '#fff' },
-
   noteInput: {
     backgroundColor: '#242424',
     borderRadius: 12,
@@ -422,7 +406,6 @@ const s = StyleSheet.create({
     color: '#fff',
     fontSize: 14,
   },
-
   panelBtns: { flexDirection: 'row', gap: 10 },
   cancelBtn: {
     flex: 1,
@@ -441,7 +424,6 @@ const s = StyleSheet.create({
   },
   addBtnOff: { opacity: 0.4 },
   addBtnTxt: { color: '#fff', fontSize: 15, fontWeight: '700' },
-
   bottomBar: {
     position: 'absolute',
     bottom: Platform.OS === 'ios' ? 42 : 20,
@@ -456,7 +438,6 @@ const s = StyleSheet.create({
   },
   nextBtnTxt: { color: '#fff', fontSize: 15, fontWeight: '700' },
 
-  // ── Step 3 (Rating) ──────────────────────────
   ratingBg: { flex: 1, backgroundColor: '#0f0f0f' },
   ratingContainer: {
     flexGrow: 1,
@@ -464,7 +445,6 @@ const s = StyleSheet.create({
     padding: 28,
     paddingBottom: Platform.OS === 'ios' ? 50 : 30,
   },
-
   starsRow: {
     flexDirection: 'row',
     justifyContent: 'center',
@@ -479,7 +459,6 @@ const s = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 28,
   },
-
   summaryCard: {
     backgroundColor: '#1a1a1a',
     borderRadius: 16,
@@ -492,13 +471,11 @@ const s = StyleSheet.create({
   summaryDot: { width: 8, height: 8, borderRadius: 4 },
   summaryItem: { color: '#ddd', fontSize: 14, flex: 1 },
   summaryNote: { color: '#888' },
-
   submitBtn: {
     backgroundColor: '#00C853',
     borderRadius: 14,
     paddingVertical: 17,
     alignItems: 'center',
-    marginBottom: 4,
   },
   submitBtnOff: { opacity: 0.4 },
   submitBtnTxt: { color: '#fff', fontSize: 16, fontWeight: '700' },

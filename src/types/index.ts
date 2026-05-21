@@ -43,22 +43,24 @@ export interface RunRecord {
   distanceM: number;
   durationS: number;      // seconds
   isOffRun: boolean;
+  offRunCount: number;    // 이 런닝에서 공식 오프구간을 통과한 횟수
   submittedAt: string;    // ISO
 }
 
 export interface RankingEntry {
   rank: number;
   nickname: string;
-  valueKm: number;
+  valueKm: number;     // 롱러너: 총 km
+  valueCount: number;  // 오프러너: 오프구간 통과 런 횟수
   isCurrentUser: boolean;
 }
 
 export interface MonthlyRanking {
   month: string;
   longRunner: RankingEntry[];
-  offRunner: RankingEntry[];
+  offRunner:  RankingEntry[];
   myLongRank: { rank: number; valueKm: number } | null;
-  myOffRank:  { rank: number; valueKm: number } | null;
+  myOffRank:  { rank: number; valueCount: number } | null;
 }
 
 export type IssueType = 'road' | 'safety' | 'traffic' | 'lighting' | 'other';
@@ -77,4 +79,23 @@ export interface RouteReview {
   rating: number; // 1–5
   hasIssues: boolean;
   issues: RouteIssue[];
+}
+
+// ── 오프구간 시스템 ──────────────────────────────────────────────
+
+export interface OffZoneReport {
+  id: string;
+  userId: string;
+  coord: Coordinate;
+  categories: IssueType[];
+  runId: string;
+  timestamp: string; // ISO
+}
+
+// 100m 반경 내 2건 이상 신고 시 생성되는 오프구간
+export interface OffZone {
+  id: string;
+  center: Coordinate;
+  reportCount: number;
+  categories: IssueType[];
 }

@@ -15,17 +15,18 @@ import { generateUserId } from '../services/userService';
 
 interface Props {
   existing: UserProfile | null;
+  defaultUid?: string;
   onSave: (profile: UserProfile) => void;
-  onBack: () => void;
+  onBack?: () => void;
 }
 
-export default function ProfileSetupScreen({ existing, onSave, onBack }: Props) {
+export default function ProfileSetupScreen({ existing, defaultUid, onSave, onBack }: Props) {
   const [nickname, setNickname] = useState(existing?.nickname ?? '');
   const [optedIn, setOptedIn] = useState(existing?.optedInRanking ?? true);
 
   function handleSave() {
     const trimmed = nickname.trim();
-    const id = existing?.id ?? generateUserId();
+    const id = existing?.id ?? defaultUid ?? generateUserId();
     onSave({ id, nickname: trimmed || `러너_${id.slice(-4)}`, optedInRanking: optedIn });
   }
 
@@ -40,7 +41,7 @@ export default function ProfileSetupScreen({ existing, onSave, onBack }: Props) 
         keyboardShouldPersistTaps="handled"
         bounces={false}
       >
-        {existing && (
+        {existing && onBack && (
           <TouchableOpacity style={s.backBtn} onPress={onBack}>
             <Text style={s.backTxt}>← 뒤로</Text>
           </TouchableOpacity>
