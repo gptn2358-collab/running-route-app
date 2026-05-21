@@ -23,6 +23,7 @@ import ProfileSetupScreen from './src/screens/ProfileSetupScreen';
 import BottomTabBar, { TabKey } from './src/components/BottomTabBar';
 
 import { generateBestRoutes }                    from './src/services/routingService';
+import { saveRoute }                             from './src/services/routeStorageService';
 import { loadProfile, saveProfile }              from './src/services/userService';
 import { submitRunRecord, getMonthKey }          from './src/services/rankingService';
 import { getActiveOffZones, countOffZonesOnRoute } from './src/services/offZoneService';
@@ -50,6 +51,7 @@ export default function App() {
   const [startCoord,  setStartCoord]  = useState<Coordinate | null>(null);
   const [routes,      setRoutes]      = useState<RouteCandidate[]>([]);
   const [activeRoute, setActiveRoute] = useState<RouteCandidate | null>(null);
+  const [activeRouteId, setActiveRouteId] = useState<string>('');
   const [runStats,    setRunStats]    = useState<RunStats | null>(null);
 
   // ── 프로필 ─────────────────────────────────────────────────────
@@ -93,8 +95,10 @@ export default function App() {
     }
   }
 
-  function handleStartRun(route: RouteCandidate) {
+  async function handleStartRun(route: RouteCandidate) {
     setActiveRoute(route);
+    const routeId = await saveRoute(route);
+    setActiveRouteId(routeId);
     setRunFlow('running');
   }
 
@@ -134,6 +138,7 @@ export default function App() {
     setRunFlow(null);
     setRoutes([]);
     setActiveRoute(null);
+    setActiveRouteId('');
     setRunStats(null);
     setActiveTab('home');
   }
@@ -242,7 +247,7 @@ export default function App() {
         <StatusBar style="light" />
         <ReviewScreen
           trail={runStats.trail}
-          routePolyline={runStats.routePolyline}
+          routeId={activeRouteId}
           userId={profile?.id ?? ''}
           runId={runStats.id}
           onReviewSubmitted={handleReviewSubmitted}

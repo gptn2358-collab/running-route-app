@@ -1,9 +1,10 @@
 import { File, Paths } from 'expo-file-system';
-import { RouteReview, RouteCandidate, Coordinate } from '../types';
+import { collection, doc, setDoc, getDocs } from 'firebase/firestore';
+import { db } from '../config/firebase';
+import { RouteReview, RouteCandidate } from '../types';
 import { isNearPolyline } from '../utils/geoUtils';
 
 const ISSUE_PROXIMITY_M = 80;
-const ROUTE_OVERLAP_PROXIMITY_M = 50;
 
 const ISSUE_SEVERITY: Record<string, number> = {
   safety:   4,
@@ -13,46 +14,59 @@ const ISSUE_SEVERITY: Record<string, number> = {
   other:    1,
 };
 
-// ─── Storage ────────────────────────────────────────────────────
+// ─── Local fallback ──────────────────────────────────────────────
 
-export async function saveReview(review: RouteReview): Promise<void> {
-  const file = new File(Paths.document, 'route_reviews.json');
-  const all = await loadReviews();
-  all.push(review);
-  file.write(JSON.stringify(all));
-}
+const reviewsFile = () => new File(Paths.document, 'route_reviews.json');
 
-export async function loadReviews(): Promise<RouteReview[]> {
+async function loadLocalReviews(): Promise<RouteReview[]> {
   try {
-    const file = new File(Paths.document, 'route_reviews.json');
+    const file = reviewsFile();
     if (!file.exists) return [];
-    const raw = await file.text();
-    const parsed = JSON.parse(raw);
+    const parsed = JSON.parse(await file.text());
     return Array.isArray(parsed) ? (parsed as RouteReview[]) : [];
   } catch {
     return [];
   }
 }
 
-// ─── Penalty scoring ────────────────────────────────────────────
-
-function samplePolyline(poly: Coordinate[], max = 60): Coordinate[] {
-  if (poly.length <= max) return poly;
-  const step = Math.ceil(poly.length / max);
-  return poly.filter((_, i) => i % step === 0);
+async function saveLocalReview(review: RouteReview): Promise<void> {
+  const all = await loadLocalReviews();
+  all.push(review);
+  reviewsFile().write(JSON.stringify(all));
 }
 
+// ─── Storage ────────────────────────────────────────────────────
+
+export async function saveReview(review: RouteReview): Promise<void> {
+  await saveLocalReview(review);
+
+  if (db) {
+    try {
+      await setDoc(doc(db, 'reviews', review.id), review);
+    } catch (e) {
+      console.warn('[reviewService] Firestore 저장 실패 (오프라인?):', e);
+    }
+  }
+}
+
+export async function loadReviews(): Promise<RouteReview[]> {
+  if (db) {
+    try {
+      const snap = await getDocs(collection(db, 'reviews'));
+      return snap.docs.map(d => d.data() as RouteReview);
+    } catch (e) {
+      console.warn('[reviewService] Firestore 조회 실패, 로컬 대체:', e);
+    }
+  }
+  return loadLocalReviews();
+}
+
+// ─── Penalty scoring ────────────────────────────────────────────
+
 /**
- * Returns a penalty score (≥ 0) for a route candidate based on stored
- * reviews. Higher penalty → route passes through areas users found bad.
- *
- * Factors:
- *   • Issue proximity: each reported issue within 80 m of the route adds
- *     severity × recency to the penalty.
- *   • Low-rating route overlap: if a ≤2-star review covered ≥40% of the
- *     same road segments, add an extra overlap penalty.
- *
- * Recency uses 30-day exponential decay so older complaints fade out.
+ * 경로 후보에 대한 페널티 점수를 반환합니다 (높을수록 나쁜 경로).
+ * 이슈 좌표 기반으로 채점합니다 (routePolyline 겹침 없이).
+ * 30일 지수 감쇠로 오래된 리뷰는 자연히 영향 감소.
  */
 export function scoreRouteWithReviews(
   candidate: RouteCandidate,
@@ -66,27 +80,14 @@ export function scoreRouteWithReviews(
 
   for (const review of reviews) {
     const daysSince = (now - new Date(review.date).getTime()) / DAY_MS;
-    const recency = Math.exp(-daysSince / 30); // 30-day half-life
+    const recency = Math.exp(-daysSince / 30);
 
-    // Issue-based penalty
     if (review.hasIssues) {
       for (const issue of review.issues) {
         if (isNearPolyline(issue.coord, candidate.polyline, ISSUE_PROXIMITY_M)) {
           const severity = ISSUE_SEVERITY[issue.type] ?? 1;
           penalty += severity * recency;
         }
-      }
-    }
-
-    // Low-rating route overlap penalty
-    if (review.rating <= 2 && review.routePolyline.length > 0) {
-      const sampled = samplePolyline(review.routePolyline);
-      const overlapping = sampled.filter((p) =>
-        isNearPolyline(p, candidate.polyline, ROUTE_OVERLAP_PROXIMITY_M)
-      ).length;
-      const ratio = overlapping / sampled.length;
-      if (ratio > 0.4) {
-        penalty += (3 - review.rating) * 4 * recency;
       }
     }
   }

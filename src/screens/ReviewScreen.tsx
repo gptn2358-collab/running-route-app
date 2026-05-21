@@ -38,7 +38,7 @@ const RATING_LABELS = ['', '별로예요', '아쉬웠어요', '괜찮았어요',
 
 interface Props {
   trail: Coordinate[];
-  routePolyline: Coordinate[];
+  routeId: string;
   userId: string;
   runId: string;
   onReviewSubmitted: (review: RouteReview) => void;
@@ -46,7 +46,7 @@ interface Props {
 
 // ─── Component ───────────────────────────────────────────────────
 
-export default function ReviewScreen({ trail, routePolyline, userId, runId, onReviewSubmitted }: Props) {
+export default function ReviewScreen({ trail, routeId, userId, runId, onReviewSubmitted }: Props) {
   const [step, setStep]                 = useState<Step>('initial');
   const [issues, setIssues]             = useState<RouteIssue[]>([]);
   const [pendingCoord, setPendingCoord] = useState<Coordinate | null>(null);
@@ -103,8 +103,8 @@ export default function ReviewScreen({ trail, routePolyline, userId, runId, onRe
     try {
       const review: RouteReview = {
         id: Date.now().toString(),
+        routeId,
         date: new Date().toISOString(),
-        routePolyline,
         trail,
         rating,
         hasIssues: issues.length > 0,

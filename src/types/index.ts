@@ -71,10 +71,20 @@ export interface RouteIssue {
   note?: string;
 }
 
+export interface SavedRoute {
+  id: string;
+  waypoints: Coordinate[];
+  distanceM: number;
+  durationS: number;
+  trafficSignals: number;
+  trafficSignalLocations: Coordinate[];
+  createdAt: string; // ISO
+}
+
 export interface RouteReview {
   id: string;
+  routeId: string;   // references SavedRoute.id
   date: string; // ISO string
-  routePolyline: Coordinate[];
   trail: Coordinate[];
   rating: number; // 1–5
   hasIssues: boolean;
