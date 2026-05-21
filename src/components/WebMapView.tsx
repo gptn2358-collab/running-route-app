@@ -50,6 +50,11 @@ const WebMapView = forwardRef<WebMapViewHandle, Props>(
       if (e.nativeEvent.data === 'MAP_READY') flushPending();
     };
 
+    const handleLoadStart = () => {
+      readyRef.current = false;
+      pendingRef.current = [];
+    };
+
     // Fallback: if MAP_READY never arrives (e.g. offline), unblock after 3s
     const handleLoad = () => {
       setTimeout(() => { if (!readyRef.current) flushPending(); }, 3000);
@@ -90,6 +95,7 @@ const WebMapView = forwardRef<WebMapViewHandle, Props>(
         scrollEnabled={false}
         javaScriptEnabled
         originWhitelist={['*']}
+        onLoadStart={handleLoadStart}
         onLoad={handleLoad}
         onMessage={handleMessage}
       />

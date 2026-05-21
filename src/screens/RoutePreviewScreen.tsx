@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -65,17 +65,18 @@ export default function RoutePreviewScreen({ routes, start, onStart, onBack }: P
     if (route) applyRoute(route);
   }, [idx]);
 
-  if (!route) return null;
-
-  const initialCenter = (() => {
-    const coords = route.polyline;
+  // 한 번만 계산 — idx가 바뀌어도 source prop이 바뀌지 않아야 WebView가 리로드되지 않음
+  const initialCenter = useMemo(() => {
+    const coords = routes[0].polyline;
     const lats = coords.map((c) => c.latitude);
     const lons = coords.map((c) => c.longitude);
     return {
       latitude: (Math.min(...lats) + Math.max(...lats)) / 2,
       longitude: (Math.min(...lons) + Math.max(...lons)) / 2,
     };
-  })();
+  }, []);
+
+  if (!route) return null;
 
   return (
     <View style={s.container}>
@@ -108,10 +109,7 @@ export default function RoutePreviewScreen({ routes, start, onStart, onBack }: P
                 style={[s.tab, on && s.tabOn]}
                 onPress={() => setIdx(i)}
               >
-                <Text style={[s.tabLabel, on && s.tabLabelOn]}>경로 {i + 1}</Text>
-                <Text style={[s.tabSig, { color: on ? '#ddd' : '#888' }]}>
-                  {fmtDist(r.distance)}
-                </Text>
+                <Text style={[s.tabLabel, on && s.tabLabelOn]}>{fmtDist(r.distance)}</Text>
                 <Text style={[s.tabSig, { color: on ? '#fff' : signalColor(r.trafficSignals) }]}>
                   🚦 {r.trafficSignals}개
                 </Text>
