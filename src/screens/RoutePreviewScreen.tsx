@@ -109,6 +109,9 @@ export default function RoutePreviewScreen({ routes, start, onStart, onBack }: P
                 onPress={() => setIdx(i)}
               >
                 <Text style={[s.tabLabel, on && s.tabLabelOn]}>경로 {i + 1}</Text>
+                <Text style={[s.tabSig, { color: on ? '#ddd' : '#888' }]}>
+                  {fmtDist(r.distance)}
+                </Text>
                 <Text style={[s.tabSig, { color: on ? '#fff' : signalColor(r.trafficSignals) }]}>
                   🚦 {r.trafficSignals}개
                 </Text>
