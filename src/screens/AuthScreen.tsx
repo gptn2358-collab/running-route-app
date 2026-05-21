@@ -50,9 +50,11 @@ export default function AuthScreen({ onSuccess }: Props) {
   const [loading, setLoading]   = useState(false);
   const [error, setError]       = useState('');
 
-  const [, googleResponse, promptGoogleAsync] = Google.useAuthRequest({
-    clientId: GOOGLE_WEB_CLIENT_ID || undefined,
-  });
+  const [, googleResponse, promptGoogleAsync] = Google.useAuthRequest(
+    GOOGLE_WEB_CLIENT_ID
+      ? { clientId: GOOGLE_WEB_CLIENT_ID }
+      : { clientId: 'not-configured', androidClientId: 'not-configured', iosClientId: 'not-configured' },
+  );
 
   useEffect(() => {
     if (googleResponse?.type === 'success') {

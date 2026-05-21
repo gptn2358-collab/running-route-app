@@ -1,6 +1,7 @@
 import { initializeApp, getApps } from 'firebase/app';
 import { getFirestore, Firestore } from 'firebase/firestore';
-import { getAuth, Auth } from 'firebase/auth';
+import { initializeAuth, getReactNativePersistence, Auth } from 'firebase/auth';
+import ReactNativeAsyncStorage from '@react-native-async-storage/async-storage';
 
 // ─────────────────────────────────────────────────────────────────
 //  Firebase 프로젝트 설정값을 여기에 입력하세요.
@@ -31,7 +32,9 @@ export let auth: Auth | null = null;
 if (isConfigured) {
   const app = getApps().length ? getApps()[0] : initializeApp(FIREBASE_CONFIG);
   db = getFirestore(app);
-  auth = getAuth(app);
+  auth = initializeAuth(app, {
+    persistence: getReactNativePersistence(ReactNativeAsyncStorage),
+  });
   console.log('[Firebase] Firestore + Auth 연결됨 — 멀티유저 모드');
 } else {
   console.log('[Firebase] 설정값 없음 — 로컬 모드로 동작');
