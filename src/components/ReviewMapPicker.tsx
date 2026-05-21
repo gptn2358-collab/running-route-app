@@ -6,6 +6,7 @@ import { Coordinate } from '../types';
 export interface ReviewMapPickerHandle {
   addMarker(coord: Coordinate, colorHex: string): void;
   clearMarkers(): void;
+  clearSnapMarker(): void;
 }
 
 interface Props {
@@ -51,6 +52,9 @@ const ReviewMapPicker = forwardRef<ReviewMapPickerHandle, Props>(
       clearMarkers() {
         inject(`clearMarkers()`);
       },
+      clearSnapMarker() {
+        inject(`clearSnapMarker()`);
+      },
     }));
 
     return (
@@ -79,6 +83,17 @@ function buildHtml(trail: Coordinate[], center: Coordinate): string {
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 html,body,#map{width:100%;height:100%}
+@keyframes pulse {
+  0%   { transform:scale(1);   opacity:1; }
+  70%  { transform:scale(2.2); opacity:0; }
+  100% { transform:scale(2.2); opacity:0; }
+}
+.snap-ring {
+  width:22px; height:22px; border-radius:50%;
+  border:3px solid #FF9500;
+  animation:pulse 1s ease-out infinite;
+  box-sizing:border-box;
+}
 </style>
 </head>
 <body><div id="map"></div>
@@ -92,35 +107,43 @@ window.addEventListener('load', function() {
   }).addTo(map);
 
   if (trail.length > 1) {
-    // 달린 경로 선
-    var line = L.polyline(trail, {color:'#2979FF', weight:5, opacity:0.75}).addTo(map);
-    map.fitBounds(line.getBounds(), {padding:[44,44]});
-
-    // GPS 위치 점 — 최대 30개, 위치 선택 시 기준점이 됨
-    var dotStep = Math.max(1, Math.floor(trail.length / 30));
-    for (var i = dotStep; i < trail.length - 1; i += dotStep) {
-      L.circleMarker(trail[i], {
-        radius: 4, fillColor: '#2979FF', color: 'white', weight: 1.5, fillOpacity: 0.8
-      }).addTo(map);
-    }
+    // 흰 외곽선 + 파란 경로선으로 시인성 강화
+    L.polyline(trail, {color:'white', weight:9, opacity:0.9}).addTo(map);
+    var line = L.polyline(trail, {color:'#2979FF', weight:5, opacity:1}).addTo(map);
+    map.fitBounds(line.getBounds(), {padding:[52,52]});
 
     // 출발점 (초록)
     L.circleMarker(trail[0], {
-      radius: 9, fillColor: '#00C853', color: 'white', weight: 2.5, fillOpacity: 1
+      radius:10, fillColor:'#00C853', color:'white', weight:2.5, fillOpacity:1
     }).addTo(map);
-    // 도착점 (노랑 — 현재 위치)
+    // 도착점 (빨강)
     L.circleMarker(trail[trail.length-1], {
-      radius: 9, fillColor: '#FFD60A', color: 'white', weight: 2.5, fillOpacity: 1
+      radius:10, fillColor:'#FF453A', color:'white', weight:2.5, fillOpacity:1
     }).addTo(map);
   } else {
     map.setView([${center.latitude},${center.longitude}], 15);
   }
 
+  // 트레일에서 가장 가까운 점 찾기 (위도·경도 제곱 거리 비교)
+  function nearestTrailPoint(lat, lon) {
+    var best = trail[0];
+    var bestD = Infinity;
+    for (var i = 0; i < trail.length; i++) {
+      var dlat = lat - trail[i][0];
+      var dlon = lon - trail[i][1];
+      var d = dlat*dlat + dlon*dlon;
+      if (d < bestD) { bestD = d; best = trail[i]; }
+    }
+    return best;
+  }
+
   var issueMarkers = [];
+  var snapMarker = null;  // 탭 미확정 스냅 마커
 
   window.addMarker = function(lat, lon, color) {
+    // 확정된 이슈 마커 (불투명, 외곽선 두꺼움)
     var m = L.circleMarker([lat, lon], {
-      radius:11, fillColor:color, color:'white', weight:2.5, fillOpacity:0.92
+      radius:11, fillColor:color, color:'white', weight:3, fillOpacity:0.95
     }).addTo(map);
     issueMarkers.push(m);
   };
@@ -130,10 +153,31 @@ window.addEventListener('load', function() {
     issueMarkers = [];
   };
 
-  // Tap = click anywhere on map
+  window.clearSnapMarker = function() {
+    if (snapMarker) { map.removeLayer(snapMarker); snapMarker = null; }
+  };
+
+  // 지도 탭 → 트레일 위 최근접 점으로 스냅
   map.on('click', function(e) {
+    if (trail.length === 0) {
+      window.ReactNativeWebView && window.ReactNativeWebView.postMessage(
+        JSON.stringify({type:'tap', lat:e.latlng.lat, lon:e.latlng.lng})
+      );
+      return;
+    }
+
+    var pt = nearestTrailPoint(e.latlng.lat, e.latlng.lng);
+
+    // 이전 스냅 마커 제거 후 새 위치에 pulse 링 표시
+    if (snapMarker) map.removeLayer(snapMarker);
+    var ringIcon = L.divIcon({
+      className:'', html:'<div class="snap-ring"></div>',
+      iconSize:[22,22], iconAnchor:[11,11]
+    });
+    snapMarker = L.marker([pt[0], pt[1]], {icon:ringIcon, zIndexOffset:2000}).addTo(map);
+
     window.ReactNativeWebView && window.ReactNativeWebView.postMessage(
-      JSON.stringify({type:'tap', lat:e.latlng.lat, lon:e.latlng.lng})
+      JSON.stringify({type:'tap', lat:pt[0], lon:pt[1]})
     );
   });
 

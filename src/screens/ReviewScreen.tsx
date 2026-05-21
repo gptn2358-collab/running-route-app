@@ -78,6 +78,7 @@ export default function ReviewScreen({ trail, routePolyline, onDone, onReviewSub
       note: note.trim() || undefined,
     };
     setIssues((prev) => [...prev, issue]);
+    mapRef.current?.clearSnapMarker();
     mapRef.current?.addMarker(pendingCoord, cfg.color);
     setPendingCoord(null);
     setSelectedType(null);
@@ -85,6 +86,7 @@ export default function ReviewScreen({ trail, routePolyline, onDone, onReviewSub
   }
 
   function handleCancelIssue() {
+    mapRef.current?.clearSnapMarker();
     setPendingCoord(null);
     setSelectedType(null);
     setNote('');
