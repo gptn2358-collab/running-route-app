@@ -1,4 +1,5 @@
-import { ANTHROPIC_API_KEY } from '../config/anthropic';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '../config/firebase';
 import { RunRecord, RunSegment, UserProfile } from '../types';
 
 export interface ChatMessage {
@@ -31,6 +32,31 @@ const SYSTEM_PROMPT = `당신은 전문 러닝 코치 AI입니다. 한국어로 
 - 지나치게 길지 않게 (3-5문단 이내)
 - 이모지 적절히 활용해 가독성 높이기
 - 질문에 직접 답하고, 관련 데이터가 없으면 일반적 조언 제공`;
+
+// 앱 실행 중 Firestore 조회를 한 번만 하도록 메모리에 캐시
+let cachedKey: string | null = null;
+let cachedModel: string = 'meta/llama-3.1-70b-instruct';
+
+async function loadAIConfig(): Promise<{ key: string; model: string }> {
+  if (cachedKey) return { key: cachedKey, model: cachedModel };
+
+  if (!db) throw new Error('Firebase 연결이 필요합니다.');
+
+  const snap = await getDoc(doc(db, 'config', 'ai'));
+  if (!snap.exists()) {
+    throw new Error('AI 코치가 아직 준비되지 않았습니다.\n잠시 후 다시 시도해주세요.');
+  }
+
+  const data = snap.data();
+  const key = data?.nvidia_key as string | undefined;
+  if (!key) {
+    throw new Error('AI 코치가 아직 준비되지 않았습니다.\n잠시 후 다시 시도해주세요.');
+  }
+
+  cachedKey = key;
+  if (data?.nvidia_model) cachedModel = data.nvidia_model;
+  return { key: cachedKey, model: cachedModel };
+}
 
 function buildUserContext(
   profile: UserProfile | null,
@@ -99,29 +125,32 @@ export async function sendAIMessage(
   history: RunRecord[],
   recentSegments?: RunSegment[],
 ): Promise<string> {
-  if (!ANTHROPIC_API_KEY) {
-    throw new Error('AI 코치를 사용하려면 Anthropic API 키를 설정해주세요.\nsrc/config/anthropic.ts 파일에 키를 입력하세요.');
-  }
+  const { key, model } = await loadAIConfig();
 
   const userContext = buildUserContext(profile, history, recentSegments);
   const systemWithContext = `${SYSTEM_PROMPT}\n\n${userContext}`;
 
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
+  const response = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'x-api-key': ANTHROPIC_API_KEY,
-      'anthropic-version': '2023-06-01',
+      'Authorization': `Bearer ${key}`,
     },
     body: JSON.stringify({
-      model: 'claude-opus-4-5',
+      model,
       max_tokens: 1024,
-      system: systemWithContext,
-      messages: messages.map(m => ({ role: m.role, content: m.content })),
+      messages: [
+        { role: 'system', content: systemWithContext },
+        ...messages.map(m => ({ role: m.role, content: m.content })),
+      ],
     }),
   });
 
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err?.message ?? `API 오류 (${response.status})`);
+  }
+
   const data = await response.json();
-  const textBlock = data.content?.find((b: any) => b.type === 'text');
-  return textBlock?.text ?? '';
+  return data.choices?.[0]?.message?.content ?? '';
 }

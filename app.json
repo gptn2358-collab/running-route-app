@@ -2,6 +2,7 @@
   "expo": {
     "name": "달리기 경로",
     "slug": "running-route-app",
+    "scheme": "runningmate",
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "dark",
