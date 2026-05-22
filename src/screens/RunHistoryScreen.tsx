@@ -81,7 +81,20 @@ function AiCoachTab({ profile, history }: AiCoachProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
+  const [elapsed, setElapsed] = useState(0);
   const flatRef = useRef<FlatList<ChatMessage>>(null);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    if (sending) {
+      setElapsed(0);
+      timerRef.current = setInterval(() => setElapsed(s => s + 1), 1000);
+    } else {
+      if (timerRef.current) clearInterval(timerRef.current);
+      setElapsed(0);
+    }
+    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+  }, [sending]);
 
   // Extract most recent run's segments from local storage
   // (passed via history metadata — we use a best-effort reconstruction)
@@ -168,7 +181,7 @@ function AiCoachTab({ profile, history }: AiCoachProps) {
           )}
           ListFooterComponent={sending ? (
             <View style={[ai.bubble, ai.bubbleAI]}>
-              <ActivityIndicator color="#00C853" size="small" />
+              <Text style={ai.thinkingTxt}>생각 중... {elapsed}초</Text>
             </View>
           ) : null}
         />
@@ -478,6 +491,7 @@ const ai = StyleSheet.create({
   bubbleTxt: { fontSize: 14, lineHeight: 20 },
   bubbleTxtUser: { color: '#fff' },
   bubbleTxtAI: { color: '#ddd' },
+  thinkingTxt: { color: '#00C853', fontSize: 14 },
 
   inputRow: {
     flexDirection: 'row',

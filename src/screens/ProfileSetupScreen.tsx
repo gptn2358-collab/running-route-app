@@ -118,7 +118,7 @@ const s = StyleSheet.create({
     padding: 24,
     paddingBottom: Platform.OS === 'ios' ? 50 : 30,
   },
-  backBtn: { marginBottom: 16, marginTop: 20 },
+  backBtn: { marginBottom: 16, marginTop: 40 },
   backTxt: { color: '#00C853', fontSize: 15 },
   emoji: { fontSize: 56, textAlign: 'center', marginBottom: 12, marginTop: 20 },
   title: {
