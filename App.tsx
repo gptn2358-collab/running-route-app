@@ -296,6 +296,7 @@ export default function App() {
           {activeTab === 'mypage' && (
             <MyPageScreen
               profile={profile}
+              email={(firebaseUser as FirebaseUser | null)?.email ?? ''}
               onProfileChange={setProfile}
               onEditProfile={() => setShowProfileSetup(true)}
             />

@@ -6,15 +6,18 @@ import {
 import { UserProfile, RunRecord } from '../types';
 import { getUserRunHistory } from '../services/rankingService';
 import { saveProfile } from '../services/userService';
+import AccountScreen from './AccountScreen';
 
 interface Props {
   profile: UserProfile | null;
+  email: string;
   onProfileChange: (p: UserProfile) => void;
   onEditProfile: () => void;
 }
 
-export default function MyPageScreen({ profile, onProfileChange, onEditProfile }: Props) {
-  const [allRuns, setAllRuns] = useState<RunRecord[]>([]);
+export default function MyPageScreen({ profile, email, onProfileChange, onEditProfile }: Props) {
+  const [allRuns, setAllRuns]         = useState<RunRecord[]>([]);
+  const [showAccount, setShowAccount] = useState(false);
 
   useEffect(() => {
     getUserRunHistory(profile?.id ?? '').then(setAllRuns);
@@ -111,6 +114,24 @@ export default function MyPageScreen({ profile, onProfileChange, onEditProfile }
         )}
       </View>
 
+      {/* 계정 관리 배너 */}
+      <TouchableOpacity style={s.accountBanner} onPress={() => setShowAccount(true)}>
+        <View style={s.accountBannerLeft}>
+          <Text style={s.accountBannerTitle}>계정 관리</Text>
+          <Text style={s.accountBannerSub}>
+            {email ? email : '아이디 · 비밀번호 변경'}
+          </Text>
+        </View>
+        <Text style={s.accountBannerArrow}>›</Text>
+      </TouchableOpacity>
+
+      {/* AccountScreen 모달 */}
+      <AccountScreen
+        email={email}
+        visible={showAccount}
+        onClose={() => setShowAccount(false)}
+      />
+
       {/* 오프러너 설명 */}
       <View style={[s.sectionCard, s.offCard]}>
         <Text style={[s.cardTitle, s.offTitle]}>🛡️ 오프러너 뱃지란?</Text>
@@ -190,4 +211,16 @@ const s = StyleSheet.create({
   offCard: { backgroundColor: '#1a1209', borderWidth: 1, borderColor: '#3a2a0a' },
   offTitle: { color: '#FFD60A' },
   offDesc: { color: '#9a8060', fontSize: 13, lineHeight: 20 },
+
+  accountBanner: {
+    backgroundColor: '#1a1a1a',
+    borderRadius: 20,
+    padding: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  accountBannerLeft: { flex: 1 },
+  accountBannerTitle: { color: '#ddd', fontSize: 15, fontWeight: '700' },
+  accountBannerSub: { color: '#555', fontSize: 12, marginTop: 3 },
+  accountBannerArrow: { color: '#444', fontSize: 22 },
 });
