@@ -232,6 +232,12 @@ window.addEventListener('load', function() {
     runner.setLatLng([lat, lon]);
     trailLine.setLatLngs(trail);
 
+    // 출발점에서 200m 이상 이동하면 출발 안내 제거
+    if (!startDirRemoved && origRoute.length > 0) {
+      var dlat = lat-origRoute[0][0], dlon = (lon-origRoute[0][1])*Math.cos(lat*Math.PI/180);
+      if (Math.sqrt(dlat*dlat+dlon*dlon)*111000 > 200) removeStartDir();
+    }
+
     if (bathroomActive && wcDest) {
       // 화장실 모드: 러너와 화장실이 모두 보이도록 뷰 유지
       // panTo 하지 않고 fitBounds로 두 지점이 항상 화면 안에 오도록 함
@@ -263,6 +269,8 @@ window.addEventListener('load', function() {
     progressIdx = 0;
     coveredLine.setLatLngs([]);
     remainingLine.setLatLngs(coords);
+    removeStartDir();
+    drawRouteArrows(coords);
   };
 
   window.resetSignals = function(sigs) {
@@ -282,12 +290,54 @@ window.addEventListener('load', function() {
     });
   };
 
-  // ── 첫 60초 출발 방향 안내 ───────────────────────────────────────
+  // ── 방위각 계산 유틸 ────────────────────────────────────────────
+  function calcBearing(p1, p2) {
+    var dLonR = (p2[1]-p1[1])*Math.PI/180;
+    var lat1r = p1[0]*Math.PI/180, lat2r = p2[0]*Math.PI/180;
+    var yy = Math.sin(dLonR)*Math.cos(lat2r);
+    var xx = Math.cos(lat1r)*Math.sin(lat2r)-Math.sin(lat1r)*Math.cos(lat2r)*Math.cos(dLonR);
+    return (Math.atan2(yy,xx)*180/Math.PI+360)%360;
+  }
+
+  // ── 경로 전체 방향 화살표 ────────────────────────────────────────
+  var routeArrowLayers = [];
+  function drawRouteArrows(route) {
+    routeArrowLayers.forEach(function(l){ map.removeLayer(l); });
+    routeArrowLayers = [];
+    if (route.length < 2) return;
+    // 약 150m마다 화살표 배치 (위도 기준 0.00135° ≈ 150m)
+    var SPACING = 0.00135;
+    var cumDeg = 0;
+    var lastDeg = SPACING * 0.5; // 첫 화살표를 75m 지점부터 시작
+    for (var i = 1; i < route.length; i++) {
+      var dlat = route[i][0]-route[i-1][0];
+      var dlon = (route[i][1]-route[i-1][1])*Math.cos(route[i][0]*Math.PI/180);
+      cumDeg += Math.sqrt(dlat*dlat+dlon*dlon);
+      if (cumDeg >= lastDeg) {
+        var bearing = calcBearing(route[i-1], route[i]);
+        var lat = (route[i][0]+route[i-1][0])/2;
+        var lon = (route[i][1]+route[i-1][1])/2;
+        var aHtml = '<div style="width:0;height:0;'
+          +'border-left:7px solid transparent;border-right:7px solid transparent;'
+          +'border-bottom:16px solid rgba(41,121,255,0.75);'
+          +'transform:rotate('+bearing+'deg);transform-origin:50% 67%;'
+          +'filter:drop-shadow(0 0 2px white);"></div>';
+        var am = L.marker([lat,lon],{
+          icon:L.divIcon({className:'',html:aHtml,iconSize:[14,16],iconAnchor:[7,8]}),
+          zIndexOffset:400, interactive:false
+        }).addTo(map);
+        routeArrowLayers.push(am);
+        lastDeg += SPACING;
+      }
+    }
+  }
+  drawRouteArrows(origRoute);
+
+  // ── 출발 방향 안내 (러너가 200m 이동할 때까지 유지) ──────────────
+  var startDirLayers = [];
+  var startDirRemoved = false;
   (function() {
     if (origRoute.length < 2) return;
-    var dirLayers = [];
-
-    // 첫 ~400m 구간 강조 (주황색)
     var seg = [origRoute[0]], cum = 0;
     for (var i = 1; i < origRoute.length; i++) {
       var dlat = origRoute[i][0]-origRoute[i-1][0];
@@ -296,47 +346,40 @@ window.addEventListener('load', function() {
       seg.push(origRoute[i]);
       if (cum >= 400) break;
     }
-    dirLayers.push(L.polyline(seg, {color:'white',  weight:14, opacity:0.9}).addTo(map));
-    dirLayers.push(L.polyline(seg, {color:'#FF9500', weight: 9, opacity:1.0}).addTo(map));
+    startDirLayers.push(L.polyline(seg,{color:'white', weight:14,opacity:0.9}).addTo(map));
+    startDirLayers.push(L.polyline(seg,{color:'#FF9500',weight:9, opacity:1.0}).addTo(map));
 
-    // 방위각 계산
-    var p1 = origRoute[0], p2 = origRoute[Math.min(5, origRoute.length-1)];
-    var dLonR = (p2[1]-p1[1])*Math.PI/180;
-    var lat1r = p1[0]*Math.PI/180, lat2r = p2[0]*Math.PI/180;
-    var yy = Math.sin(dLonR)*Math.cos(lat2r);
-    var xx = Math.cos(lat1r)*Math.sin(lat2r) - Math.sin(lat1r)*Math.cos(lat2r)*Math.cos(dLonR);
-    var bearing = (Math.atan2(yy,xx)*180/Math.PI+360)%360;
-
+    var bearing = calcBearing(origRoute[0], origRoute[Math.min(5,origRoute.length-1)]);
     var dirs = ['북','북동','동','남동','남','남서','서','북서'];
     var dirLabel = dirs[Math.round(bearing/45)%8];
+    var p1 = origRoute[0];
 
-    // 출발 방향 배지
-    var badgeHtml = '<div style="background:#FF9500;color:white;font-size:13px;font-weight:700;'
-      + 'padding:5px 12px;border-radius:20px;white-space:nowrap;border:2.5px solid white;'
-      + 'box-shadow:0 2px 8px rgba(0,0,0,0.4);">▶ '+dirLabel+'쪽으로 출발</div>';
-    dirLayers.push(L.marker([p1[0],p1[1]], {
-      icon: L.divIcon({className:'',html:badgeHtml,iconSize:[160,32],iconAnchor:[-8,16]}),
-      zIndexOffset: 900
+    var badgeHtml = '<div style="background:#FF9500;color:white;font-size:14px;font-weight:800;'
+      +'padding:7px 16px;border-radius:22px;white-space:nowrap;border:2.5px solid white;'
+      +'box-shadow:0 2px 10px rgba(0,0,0,0.5);">▶ '+dirLabel+'쪽으로 출발!</div>';
+    startDirLayers.push(L.marker([p1[0],p1[1]],{
+      icon:L.divIcon({className:'',html:badgeHtml,iconSize:[180,36],iconAnchor:[-8,18]}),
+      zIndexOffset:950
     }).addTo(map));
 
-    // 방향 화살표 (경로 중간 지점)
-    var midIdx = Math.max(1, Math.floor(seg.length/2));
-    var arrowHtml = '<div style="width:0;height:0;'
-      + 'border-left:12px solid transparent;border-right:12px solid transparent;'
-      + 'border-bottom:28px solid #FF9500;'
-      + 'transform:rotate('+bearing+'deg);transform-origin:50% 67%;'
-      + 'filter:drop-shadow(0 0 3px white) drop-shadow(0 0 3px white);"></div>';
-    dirLayers.push(L.marker([seg[midIdx][0],seg[midIdx][1]], {
-      icon: L.divIcon({className:'',html:arrowHtml,iconSize:[24,28],iconAnchor:[12,14]}),
-      zIndexOffset: 850
+    var midIdx = Math.max(1,Math.floor(seg.length/2));
+    var aHtml2 = '<div style="width:0;height:0;'
+      +'border-left:13px solid transparent;border-right:13px solid transparent;'
+      +'border-bottom:30px solid #FF9500;'
+      +'transform:rotate('+bearing+'deg);transform-origin:50% 67%;'
+      +'filter:drop-shadow(0 0 4px white) drop-shadow(0 0 4px white);"></div>';
+    startDirLayers.push(L.marker([seg[midIdx][0],seg[midIdx][1]],{
+      icon:L.divIcon({className:'',html:aHtml2,iconSize:[26,30],iconAnchor:[13,15]}),
+      zIndexOffset:900
     }).addTo(map));
-
-    // 60초 후 자동 제거
-    window.setTimeout(function() {
-      dirLayers.forEach(function(l){ map.removeLayer(l); });
-      dirLayers = [];
-    }, 60000);
   })();
+
+  function removeStartDir() {
+    if (startDirRemoved) return;
+    startDirRemoved = true;
+    startDirLayers.forEach(function(l){ map.removeLayer(l); });
+    startDirLayers = [];
+  }
 
   window.ReactNativeWebView && window.ReactNativeWebView.postMessage('MAP_READY');
 });
