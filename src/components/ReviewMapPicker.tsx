@@ -124,13 +124,15 @@ window.addEventListener('load', function() {
     map.setView([${center.latitude},${center.longitude}], 15);
   }
 
-  // 트레일에서 가장 가까운 점 찾기 (위도·경도 제곱 거리 비교)
+  // 트레일에서 가장 가까운 점 찾기
+  // cosLat 보정: 경도 1°의 실제 거리는 위도에 따라 달라지므로 cos(lat) 적용
   function nearestTrailPoint(lat, lon) {
     var best = trail[0];
     var bestD = Infinity;
+    var cosLat = Math.cos(lat * Math.PI / 180);
     for (var i = 0; i < trail.length; i++) {
       var dlat = lat - trail[i][0];
-      var dlon = lon - trail[i][1];
+      var dlon = (lon - trail[i][1]) * cosLat;
       var d = dlat*dlat + dlon*dlon;
       if (d < bestD) { bestD = d; best = trail[i]; }
     }

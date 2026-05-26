@@ -61,6 +61,7 @@ export default function RunningScreen({ route: initialRoute, start, onFinish }: 
   const predTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const prevPosRef    = useRef<Coordinate>(start);
+  const prevTimeRef   = useRef<number>(Date.now());
   const pausedRef     = useRef(false);
   const posRef        = useRef<Coordinate>(start);
   const trailRef      = useRef<Coordinate[]>([start]);
@@ -240,6 +241,12 @@ export default function RunningScreen({ route: initialRoute, start, onFinish }: 
         };
         const delta = haversineDistance(prevPosRef.current, newPos);
         if (delta < 3) return;
+
+        // GPS 스파이크 필터: 이전 점과의 속도가 8 m/s(약 29 km/h)를 초과하면 오류 신호로 버림
+        const now = loc.timestamp ?? Date.now();
+        const dtSec = (now - prevTimeRef.current) / 1000;
+        if (dtSec > 0 && delta / dtSec > 8) return;
+        prevTimeRef.current = now;
 
         prevPosRef.current = newPos;
         posRef.current     = newPos;
