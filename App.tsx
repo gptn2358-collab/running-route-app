@@ -73,6 +73,7 @@ export default function App() {
 
   useEffect(() => {
     if (firebaseUser === 'loading') return;
+    setProfile(null); // 계정 전환 시 이전 사용자 데이터 즉시 제거
     const uid = (firebaseUser as FirebaseUser | null)?.uid;
     loadProfile(uid).then(p => setProfile(p));
   }, [firebaseUser]);

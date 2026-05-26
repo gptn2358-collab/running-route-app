@@ -1,5 +1,5 @@
 import { File, Paths } from 'expo-file-system';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { db, auth } from '../config/firebase';
 import { UserProfile } from '../types';
 
@@ -28,11 +28,21 @@ export async function loadProfile(uid?: string): Promise<UserProfile | null> {
   if (uid && db) {
     try {
       const snap = await getDoc(doc(db, 'users', uid));
-      if (snap.exists()) return snap.data() as UserProfile;
+      if (snap.exists()) {
+        const p = snap.data() as UserProfile;
+        saveLocalProfile(p); // 로컬 캐시 갱신
+        return p;
+      }
+      // Firestore에 이 uid의 프로필이 없음 → 프로필 설정 화면으로
+      return null;
     } catch (e) {
       console.warn('[userService] Firestore 프로필 조회 실패:', e);
+      // 오프라인 시: 로컬 캐시가 이 uid와 일치할 때만 사용
+      const local = await loadLocalProfile();
+      return local?.id === uid ? local : null;
     }
   }
+  // uid 없음 = Firebase 미연결 로컬 모드
   return loadLocalProfile();
 }
 
@@ -44,6 +54,24 @@ export async function saveProfile(profile: UserProfile): Promise<void> {
     } catch (e) {
       console.warn('[userService] Firestore 프로필 저장 실패:', e);
     }
+  }
+}
+
+// 닉네임 사용 가능 여부 확인 (currentUid 본인은 제외)
+export async function checkNicknameAvailable(
+  nickname: string,
+  currentUid?: string,
+): Promise<boolean> {
+  if (!db) return true; // 로컬 모드는 멀티유저 없음 — 항상 허용
+  try {
+    const snap = await getDocs(
+      query(collection(db, 'users'), where('nickname', '==', nickname))
+    );
+    // 결과가 없거나, 본인 문서만 있으면 사용 가능
+    return snap.docs.every(d => d.id === currentUid);
+  } catch (e) {
+    console.warn('[userService] 닉네임 중복 확인 실패:', e);
+    return true; // 오류 시 차단하지 않음 (네트워크 불안정 대비)
   }
 }
 

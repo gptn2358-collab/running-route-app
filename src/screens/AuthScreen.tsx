@@ -14,6 +14,7 @@ import {
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
+  sendPasswordResetEmail,
   GoogleAuthProvider,
   signInWithCredential,
 } from 'firebase/auth';
@@ -32,7 +33,7 @@ interface Props {
   onSuccess: () => void;
 }
 
-type Mode = 'login' | 'signup';
+type Mode = 'login' | 'signup' | 'reset';
 
 const AUTH_ERRORS: Record<string, string> = {
   'auth/email-already-in-use': '이미 사용 중인 이메일입니다.',
@@ -44,11 +45,12 @@ const AUTH_ERRORS: Record<string, string> = {
 };
 
 export default function AuthScreen({ onSuccess }: Props) {
-  const [mode, setMode]         = useState<Mode>('login');
-  const [email, setEmail]       = useState('');
-  const [password, setPassword] = useState('');
-  const [loading, setLoading]   = useState(false);
-  const [error, setError]       = useState('');
+  const [mode, setMode]           = useState<Mode>('login');
+  const [email, setEmail]         = useState('');
+  const [password, setPassword]   = useState('');
+  const [loading, setLoading]     = useState(false);
+  const [error, setError]         = useState('');
+  const [resetSent, setResetSent] = useState(false);
 
   const [, googleResponse, promptGoogleAsync] = Google.useAuthRequest(
     GOOGLE_WEB_CLIENT_ID
@@ -105,9 +107,32 @@ export default function AuthScreen({ onSuccess }: Props) {
     promptGoogleAsync();
   }
 
+  async function handlePasswordReset() {
+    const trimmed = email.trim();
+    if (!trimmed) {
+      setError('이메일을 입력해주세요.');
+      return;
+    }
+    if (!auth) {
+      setError('Firebase가 설정되지 않았습니다.');
+      return;
+    }
+    setLoading(true);
+    setError('');
+    try {
+      await sendPasswordResetEmail(auth, trimmed);
+      setResetSent(true);
+    } catch (e: any) {
+      setError(AUTH_ERRORS[e.code] ?? '재설정 이메일 발송에 실패했습니다.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
   function switchMode(next: Mode) {
     setMode(next);
     setError('');
+    setResetSent(false);
   }
 
   return (
@@ -125,55 +150,123 @@ export default function AuthScreen({ onSuccess }: Props) {
         <Text style={s.title}>달리기 경로 앱</Text>
         <Text style={s.subtitle}>로그인하고 랭킹에 참여해보세요</Text>
 
-        {/* 탭 */}
-        <View style={s.tabs}>
-          <TouchableOpacity
-            style={[s.tab, mode === 'login' && s.tabOn]}
-            onPress={() => switchMode('login')}
-          >
-            <Text style={[s.tabTxt, mode === 'login' && s.tabTxtOn]}>로그인</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[s.tab, mode === 'signup' && s.tabOn]}
-            onPress={() => switchMode('signup')}
-          >
-            <Text style={[s.tabTxt, mode === 'signup' && s.tabTxtOn]}>회원가입</Text>
-          </TouchableOpacity>
-        </View>
+        {/* ── 비밀번호 찾기 모드 ─────────────────────────────── */}
+        {mode === 'reset' ? (
+          <>
+            <TouchableOpacity style={s.backLink} onPress={() => switchMode('login')}>
+              <Text style={s.backLinkTxt}>← 로그인으로 돌아가기</Text>
+            </TouchableOpacity>
 
-        {/* 입력 */}
-        <TextInput
-          style={s.input}
-          placeholder="이메일"
-          placeholderTextColor="#555"
-          value={email}
-          onChangeText={v => { setEmail(v); setError(''); }}
-          keyboardType="email-address"
-          autoCapitalize="none"
-          autoCorrect={false}
-        />
-        <TextInput
-          style={s.input}
-          placeholder="비밀번호 (6자 이상)"
-          placeholderTextColor="#555"
-          value={password}
-          onChangeText={v => { setPassword(v); setError(''); }}
-          secureTextEntry
-        />
+            <Text style={s.resetTitle}>비밀번호 재설정</Text>
+            <Text style={s.resetDesc}>
+              가입한 이메일 주소를 입력하면{'\n'}재설정 링크를 보내드립니다.
+            </Text>
 
-        {!!error && <Text style={s.errorTxt}>{error}</Text>}
+            {resetSent ? (
+              <View style={s.sentBox}>
+                <Text style={s.sentIcon}>✉️</Text>
+                <Text style={s.sentTitle}>이메일을 발송했습니다</Text>
+                <Text style={s.sentDesc}>
+                  {email.trim()} 으로 재설정 링크를 보냈어요.{'\n'}
+                  메일함을 확인해주세요. (스팸 폴더도 확인)
+                </Text>
+                <TouchableOpacity style={s.mainBtn} onPress={() => switchMode('login')}>
+                  <Text style={s.mainBtnTxt}>로그인으로 돌아가기</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <>
+                <TextInput
+                  style={s.input}
+                  placeholder="가입한 이메일"
+                  placeholderTextColor="#555"
+                  value={email}
+                  onChangeText={v => { setEmail(v); setError(''); }}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  autoFocus
+                />
+                {!!error && <Text style={s.errorTxt}>{error}</Text>}
+                <TouchableOpacity
+                  style={[s.mainBtn, loading && s.mainBtnOff]}
+                  onPress={handlePasswordReset}
+                  disabled={loading}
+                >
+                  {loading
+                    ? <ActivityIndicator color="#fff" />
+                    : <Text style={s.mainBtnTxt}>재설정 링크 보내기</Text>
+                  }
+                </TouchableOpacity>
+              </>
+            )}
+          </>
+        ) : (
+          <>
+            {/* 탭 */}
+            <View style={s.tabs}>
+              <TouchableOpacity
+                style={[s.tab, mode === 'login' && s.tabOn]}
+                onPress={() => switchMode('login')}
+              >
+                <Text style={[s.tabTxt, mode === 'login' && s.tabTxtOn]}>로그인</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[s.tab, mode === 'signup' && s.tabOn]}
+                onPress={() => switchMode('signup')}
+              >
+                <Text style={[s.tabTxt, mode === 'signup' && s.tabTxtOn]}>회원가입</Text>
+              </TouchableOpacity>
+            </View>
 
-        <TouchableOpacity
-          style={[s.mainBtn, loading && s.mainBtnOff]}
-          onPress={handleEmailAuth}
-          disabled={loading}
-        >
-          {loading
-            ? <ActivityIndicator color="#fff" />
-            : <Text style={s.mainBtnTxt}>{mode === 'login' ? '로그인' : '회원가입'}</Text>
-          }
-        </TouchableOpacity>
+            {/* 입력 */}
+            <TextInput
+              style={s.input}
+              placeholder="이메일"
+              placeholderTextColor="#555"
+              value={email}
+              onChangeText={v => { setEmail(v); setError(''); }}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+            <TextInput
+              style={s.input}
+              placeholder="비밀번호 (6자 이상)"
+              placeholderTextColor="#555"
+              value={password}
+              onChangeText={v => { setPassword(v); setError(''); }}
+              secureTextEntry
+            />
 
+            {!!error && <Text style={s.errorTxt}>{error}</Text>}
+
+            <TouchableOpacity
+              style={[s.mainBtn, loading && s.mainBtnOff]}
+              onPress={handleEmailAuth}
+              disabled={loading}
+            >
+              {loading
+                ? <ActivityIndicator color="#fff" />
+                : <Text style={s.mainBtnTxt}>{mode === 'login' ? '로그인' : '회원가입'}</Text>
+              }
+            </TouchableOpacity>
+
+            {/* 비밀번호 찾기 링크 — 로그인 모드에서만 표시 */}
+            {mode === 'login' && (
+              <TouchableOpacity
+                style={s.forgotLink}
+                onPress={() => switchMode('reset')}
+              >
+                <Text style={s.forgotTxt}>비밀번호를 잊으셨나요?</Text>
+              </TouchableOpacity>
+            )}
+          </>
+        )}
+
+        {/* 구분선 + Google — reset 모드 아닐 때만 */}
+        {mode !== 'reset' && (
+          <>
         {/* 구분선 */}
         <View style={s.dividerRow}>
           <View style={s.dividerLine} />
@@ -185,6 +278,8 @@ export default function AuthScreen({ onSuccess }: Props) {
         <TouchableOpacity style={s.googleBtn} onPress={handleGooglePress}>
           <Text style={s.googleBtnTxt}>G  Google로 계속하기</Text>
         </TouchableOpacity>
+          </>
+        )}
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -255,4 +350,22 @@ const s = StyleSheet.create({
     borderColor: '#2a2a2a',
   },
   googleBtnTxt: { color: '#ddd', fontSize: 15, fontWeight: '600' },
+
+  forgotLink: { alignItems: 'center', paddingVertical: 12 },
+  forgotTxt: { color: '#00C853', fontSize: 14 },
+
+  backLink: { marginBottom: 24 },
+  backLinkTxt: { color: '#00C853', fontSize: 14 },
+
+  resetTitle: { color: '#fff', fontSize: 20, fontWeight: '800', marginBottom: 8 },
+  resetDesc: {
+    color: '#666', fontSize: 14, lineHeight: 22, marginBottom: 24,
+  },
+
+  sentBox: { alignItems: 'center', gap: 12, paddingVertical: 8 },
+  sentIcon: { fontSize: 48 },
+  sentTitle: { color: '#fff', fontSize: 18, fontWeight: '700' },
+  sentDesc: {
+    color: '#888', fontSize: 14, textAlign: 'center', lineHeight: 22,
+  },
 });

@@ -9,9 +9,10 @@ import {
   ScrollView,
   Platform,
   KeyboardAvoidingView,
+  ActivityIndicator,
 } from 'react-native';
 import { UserProfile } from '../types';
-import { generateUserId } from '../services/userService';
+import { generateUserId, checkNicknameAvailable } from '../services/userService';
 
 interface Props {
   existing: UserProfile | null;
@@ -23,11 +24,28 @@ interface Props {
 export default function ProfileSetupScreen({ existing, defaultUid, onSave, onBack }: Props) {
   const [nickname, setNickname] = useState(existing?.nickname ?? '');
   const [optedIn, setOptedIn] = useState(existing?.optedInRanking ?? true);
+  const [checking, setChecking] = useState(false);
+  const [nicknameError, setNicknameError] = useState('');
 
-  function handleSave() {
+  async function handleSave() {
     const trimmed = nickname.trim();
     const id = existing?.id ?? defaultUid ?? generateUserId();
-    onSave({ id, nickname: trimmed || `러너_${id.slice(-4)}`, optedInRanking: optedIn });
+    const finalNickname = trimmed || `러너_${id.slice(-4)}`;
+
+    // 닉네임이 변경됐거나 새로 설정하는 경우에만 중복 확인
+    const nicknameChanged = finalNickname !== existing?.nickname;
+    if (nicknameChanged) {
+      setChecking(true);
+      setNicknameError('');
+      const available = await checkNicknameAvailable(finalNickname, id);
+      setChecking(false);
+      if (!available) {
+        setNicknameError('이미 사용 중인 닉네임입니다. 다른 닉네임을 입력해주세요.');
+        return;
+      }
+    }
+
+    onSave({ id, nickname: finalNickname, optedInRanking: optedIn });
   }
 
   return (
@@ -56,15 +74,18 @@ export default function ProfileSetupScreen({ existing, defaultUid, onSave, onBac
         <View style={s.card}>
           <Text style={s.label}>닉네임</Text>
           <TextInput
-            style={s.input}
+            style={[s.input, !!nicknameError && s.inputError]}
             placeholder="예: 한강러너, 북악트레일러"
             placeholderTextColor="#555"
             value={nickname}
-            onChangeText={setNickname}
+            onChangeText={v => { setNickname(v); setNicknameError(''); }}
             maxLength={16}
             returnKeyType="done"
           />
-          <Text style={s.hint}>미입력 시 자동 생성됩니다</Text>
+          {nicknameError
+            ? <Text style={s.errorTxt}>{nicknameError}</Text>
+            : <Text style={s.hint}>미입력 시 자동 생성됩니다</Text>
+          }
         </View>
 
         <View style={s.card}>
@@ -94,10 +115,15 @@ export default function ProfileSetupScreen({ existing, defaultUid, onSave, onBac
           </View>
         )}
 
-        <TouchableOpacity style={s.saveBtn} onPress={handleSave}>
-          <Text style={s.saveBtnTxt}>
-            {existing ? '저장하기' : '시작하기'}
-          </Text>
+        <TouchableOpacity
+          style={[s.saveBtn, checking && s.saveBtnOff]}
+          onPress={handleSave}
+          disabled={checking}
+        >
+          {checking
+            ? <ActivityIndicator color="#fff" />
+            : <Text style={s.saveBtnTxt}>{existing ? '저장하기' : '시작하기'}</Text>
+          }
         </TouchableOpacity>
 
         {!existing && (
@@ -151,6 +177,8 @@ const s = StyleSheet.create({
     fontSize: 16,
   },
   hint: { color: '#444', fontSize: 11, marginTop: 6 },
+  inputError: { borderWidth: 1.5, borderColor: '#FF453A' },
+  errorTxt: { color: '#FF453A', fontSize: 12, marginTop: 6 },
   toggleRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -178,6 +206,7 @@ const s = StyleSheet.create({
     marginBottom: 4,
   },
   saveBtnTxt: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  saveBtnOff: { opacity: 0.6 },
   skipLink: { alignItems: 'center', paddingVertical: 12 },
   skipTxt: { color: '#444', fontSize: 14 },
 });

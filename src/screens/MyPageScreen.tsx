@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import { UserProfile, RunRecord } from '../types';
 import { getUserRunHistory } from '../services/rankingService';
-import { saveProfile } from '../services/userService';
+import { saveProfile, signOut } from '../services/userService';
 import AccountScreen from './AccountScreen';
 
 interface Props {
@@ -18,6 +18,13 @@ interface Props {
 export default function MyPageScreen({ profile, email, onProfileChange, onEditProfile }: Props) {
   const [allRuns, setAllRuns]         = useState<RunRecord[]>([]);
   const [showAccount, setShowAccount] = useState(false);
+
+  function handleSignOut() {
+    Alert.alert('로그아웃', '정말 로그아웃 하시겠어요?', [
+      { text: '취소', style: 'cancel' },
+      { text: '로그아웃', style: 'destructive', onPress: () => signOut() },
+    ]);
+  }
 
   useEffect(() => {
     getUserRunHistory(profile?.id ?? '').then(setAllRuns);
@@ -132,6 +139,11 @@ export default function MyPageScreen({ profile, email, onProfileChange, onEditPr
         onClose={() => setShowAccount(false)}
       />
 
+      {/* 로그아웃 */}
+      <TouchableOpacity style={s.logoutBtn} onPress={handleSignOut}>
+        <Text style={s.logoutTxt}>로그아웃</Text>
+      </TouchableOpacity>
+
       {/* 오프러너 설명 */}
       <View style={[s.sectionCard, s.offCard]}>
         <Text style={[s.cardTitle, s.offTitle]}>🛡️ 오프러너 뱃지란?</Text>
@@ -223,4 +235,14 @@ const s = StyleSheet.create({
   accountBannerTitle: { color: '#ddd', fontSize: 15, fontWeight: '700' },
   accountBannerSub: { color: '#555', fontSize: 12, marginTop: 3 },
   accountBannerArrow: { color: '#444', fontSize: 22 },
+
+  logoutBtn: {
+    backgroundColor: '#1a1a1a',
+    borderRadius: 14,
+    paddingVertical: 16,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#3a1a1a',
+  },
+  logoutTxt: { color: '#FF453A', fontSize: 15, fontWeight: '700' },
 });
