@@ -3,8 +3,9 @@ import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   Switch, Platform, Alert,
 } from 'react-native';
-import { UserProfile, RunRecord } from '../types';
+import { UserProfile, RunRecord, BattleRecord } from '../types';
 import { getUserRunHistory } from '../services/rankingService';
+import { getUserBattleHistory } from '../services/challengeService';
 import { saveProfile, signOut } from '../services/userService';
 import AccountScreen from './AccountScreen';
 
@@ -17,6 +18,7 @@ interface Props {
 
 export default function MyPageScreen({ profile, email, onProfileChange, onEditProfile }: Props) {
   const [allRuns, setAllRuns]         = useState<RunRecord[]>([]);
+  const [battleHistory, setBattleHistory] = useState<BattleRecord[]>([]);
   const [showAccount, setShowAccount] = useState(false);
 
   function handleSignOut() {
@@ -28,6 +30,9 @@ export default function MyPageScreen({ profile, email, onProfileChange, onEditPr
 
   useEffect(() => {
     getUserRunHistory(profile?.id ?? '').then(setAllRuns);
+    if (profile?.id) {
+      getUserBattleHistory(profile.id).then(setBattleHistory);
+    }
   }, [profile]);
 
   const totalKm = allRuns.reduce((s, r) => s + r.distanceM, 0) / 1000;
@@ -91,6 +96,63 @@ export default function MyPageScreen({ profile, email, onProfileChange, onEditPr
             <Text style={s.statLbl}>오프코스</Text>
           </View>
         </View>
+      </View>
+
+      {/* 대결 전적 */}
+      <View style={s.statsCard}>
+        <Text style={s.cardTitle}>대결 전적</Text>
+        {battleHistory.length === 0 ? (
+          <Text style={s.battleEmpty}>아직 참여한 대결이 없어요</Text>
+        ) : (
+          <>
+            {/* 요약 수치 */}
+            <View style={s.statsRow}>
+              <View style={s.statItem}>
+                <Text style={s.statBig}>{battleHistory.length}</Text>
+                <Text style={s.statLbl}>총 대결</Text>
+              </View>
+              <View style={s.statDiv} />
+              <View style={s.statItem}>
+                <Text style={[s.statBig, s.goldTxt]}>
+                  {battleHistory.filter(b => b.rank === 1).length}
+                </Text>
+                <Text style={s.statLbl}>🥇 1등</Text>
+              </View>
+              <View style={s.statDiv} />
+              <View style={s.statItem}>
+                <Text style={s.statBig}>
+                  {battleHistory.length > 0
+                    ? (battleHistory.reduce((s, b) => s + b.rank, 0) / battleHistory.length).toFixed(1)
+                    : '-'}
+                </Text>
+                <Text style={s.statLbl}>평균 순위</Text>
+              </View>
+            </View>
+
+            {/* 최근 전적 목록 */}
+            <View style={s.battleList}>
+              {battleHistory.slice(0, 5).map(b => {
+                const date = new Date(b.finishedAt);
+                const dateStr = `${date.getMonth() + 1}/${date.getDate()}`;
+                const rankEmoji = b.rank === 1 ? '🥇' : b.rank === 2 ? '🥈' : b.rank === 3 ? '🥉' : `${b.rank}위`;
+                return (
+                  <View key={b.challengeId} style={s.battleRow}>
+                    <Text style={s.battleRankEmoji}>{rankEmoji}</Text>
+                    <View style={s.battleInfo}>
+                      <Text style={s.battleTitle} numberOfLines={1}>{b.title}</Text>
+                      <Text style={s.battleSub}>
+                        {b.distanceKm} km · {b.totalParticipants}명 참여 · {dateStr}
+                      </Text>
+                    </View>
+                    <Text style={[s.battleRankNum, b.rank === 1 && s.goldTxt]}>
+                      {b.rank}/{b.totalParticipants}
+                    </Text>
+                  </View>
+                );
+              })}
+            </View>
+          </>
+        )}
       </View>
 
       {/* 설정 */}
@@ -206,6 +268,23 @@ const s = StyleSheet.create({
   statUnit: { color: '#555', fontSize: 12 },
   statLbl: { color: '#666', fontSize: 11, marginTop: 2 },
   statDiv: { width: 1, height: 40, backgroundColor: '#2a2a2a' },
+
+  goldTxt: { color: '#FFD60A' },
+  battleEmpty: { color: '#444', fontSize: 13, textAlign: 'center', paddingVertical: 12 },
+  battleList: { marginTop: 16, gap: 2 },
+  battleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#242424',
+    gap: 10,
+  },
+  battleRankEmoji: { fontSize: 20, width: 28, textAlign: 'center' },
+  battleInfo: { flex: 1 },
+  battleTitle: { color: '#ddd', fontSize: 14, fontWeight: '600' },
+  battleSub: { color: '#555', fontSize: 11, marginTop: 2 },
+  battleRankNum: { color: '#666', fontSize: 13, fontWeight: '700' },
 
   sectionCard: { backgroundColor: '#1a1a1a', borderRadius: 20, padding: 20 },
   settingRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },

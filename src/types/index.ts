@@ -91,6 +91,43 @@ export interface RouteReview {
   issues: RouteIssue[];
 }
 
+// ── 대결(Challenge) 시스템 ──────────────────────────────────────
+
+export interface Challenge {
+  id: string;
+  title: string;               // 방제목
+  creatorId: string;
+  creatorNickname: string;
+  distanceKm: number;          // 목표 거리
+  scheduledAt: string;         // ISO — 대결 시작 예정 시각
+  maxParticipants: number;
+  participants: string[];      // userId 배열
+  participantNicknames: Record<string, string>; // userId → nickname
+  status: 'open' | 'running' | 'finished';
+  createdAt: string;
+}
+
+export interface BattleRecord {
+  challengeId: string;
+  title: string;
+  distanceKm: number;
+  rank: number;
+  totalParticipants: number;
+  distanceM: number;    // 실제로 달린 거리
+  durationS: number;
+  finishedAt: string;   // ISO
+}
+
+export interface ChallengeProgress {
+  userId: string;
+  nickname: string;
+  distanceM: number;
+  durationS: number;
+  paceSecPerKm: number;        // 현재 평균 페이스
+  updatedAt: string;
+  finished: boolean;
+}
+
 // ── 오프구간 시스템 ──────────────────────────────────────────────
 
 export interface OffZoneReport {

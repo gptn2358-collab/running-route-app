@@ -9,6 +9,8 @@ import MainHomeScreen    from './src/screens/MainHomeScreen';
 import RunHistoryScreen  from './src/screens/RunHistoryScreen';
 import RankingScreen     from './src/screens/RankingScreen';
 import MyPageScreen      from './src/screens/MyPageScreen';
+import ChallengeScreen   from './src/screens/ChallengeScreen';
+import BattleRunScreen   from './src/screens/BattleRunScreen';
 
 // ── 달리기 플로우 화면 ────────────────────────────────────────────
 import HomeScreen         from './src/screens/HomeScreen';
@@ -30,8 +32,9 @@ import { getActiveOffZones, countOffZonesOnRoute } from './src/services/offZoneS
 import { auth, isFirebaseReady }                 from './src/config/firebase';
 import {
   Coordinate, RouteCandidate, RunStats, RouteReview,
-  UserProfile, RunRecord,
+  UserProfile, RunRecord, Challenge,
 } from './src/types';
+import { getChallenge } from './src/services/challengeService';
 
 type RunFlow = 'selecting' | 'preview' | 'running' | 'review' | 'summary';
 
@@ -57,6 +60,9 @@ export default function App() {
   // ── 프로필 ─────────────────────────────────────────────────────
   const [profile,          setProfile]          = useState<UserProfile | null>(null);
   const [showProfileSetup, setShowProfileSetup] = useState(false);
+
+  // ── 대결 플로우 ─────────────────────────────────────────────────
+  const [battleChallenge, setBattleChallenge] = useState<Challenge | null>(null);
 
   // ── Firebase 인증 상태 리스너 ────────────────────────────────────
 
@@ -148,6 +154,11 @@ export default function App() {
     await saveProfile(p);
     setProfile(p);
     setShowProfileSetup(false);
+  }
+
+  async function handleEnterBattle(challengeId: string) {
+    const c = await getChallenge(challengeId);
+    if (c) setBattleChallenge(c);
   }
 
   // ── 로딩 오버레이 ───────────────────────────────────────────────
@@ -271,6 +282,21 @@ export default function App() {
     );
   }
 
+  // ── 대결 러닝 화면 ──────────────────────────────────────────────
+
+  if (battleChallenge && profile) {
+    return (
+      <SafeAreaProvider>
+        <StatusBar style="light" />
+        <BattleRunScreen
+          challenge={battleChallenge}
+          profile={profile}
+          onFinish={() => { setBattleChallenge(null); setActiveTab('battle'); }}
+        />
+      </SafeAreaProvider>
+    );
+  }
+
   // ── 탭 네비게이터 (기본 화면) ────────────────────────────────────
 
   return (
@@ -291,6 +317,13 @@ export default function App() {
             <RankingScreen
               profile={profile}
               onBack={() => setActiveTab('home')}
+              onSetupProfile={() => setShowProfileSetup(true)}
+            />
+          )}
+          {activeTab === 'battle' && (
+            <ChallengeScreen
+              profile={profile}
+              onEnterBattle={handleEnterBattle}
               onSetupProfile={() => setShowProfileSetup(true)}
             />
           )}

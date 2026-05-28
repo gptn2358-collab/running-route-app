@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
 
-export type TabKey = 'home' | 'records' | 'ranking' | 'mypage';
+export type TabKey = 'home' | 'records' | 'ranking' | 'battle' | 'mypage';
 
 interface TabItem {
   key: TabKey;
@@ -13,6 +13,7 @@ const TABS: TabItem[] = [
   { key: 'home',    icon: '🏃',  label: '홈'        },
   { key: 'records', icon: '📊',  label: '기록'      },
   { key: 'ranking', icon: '🏆',  label: '랭킹'      },
+  { key: 'battle',  icon: '⚔️',  label: '대결'      },
   { key: 'mypage',  icon: '👤',  label: '마이페이지' },
 ];
 
