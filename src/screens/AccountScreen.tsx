@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity,
   StyleSheet, Modal, Alert, ActivityIndicator,
@@ -10,6 +10,8 @@ import {
   updatePassword,
 } from 'firebase/auth';
 import { auth } from '../config/firebase';
+import { useTheme } from '../context/ThemeContext';
+import { Colors } from '../theme';
 
 // ─── 단계 정의 ────────────────────────────────────────────────────
 // info          : 이메일 + 마스킹된 비밀번호 표시
@@ -32,6 +34,9 @@ export default function AccountScreen({ email, visible, onClose }: Props) {
   const [showNew, setShowNew]     = useState(false);
   const [loading, setLoading]     = useState(false);
   const [error, setError]         = useState('');
+
+  const { colors } = useTheme();
+  const s = useMemo(() => makeStyles(colors), [colors]);
 
   function reset() {
     setStep('info');
@@ -61,7 +66,6 @@ export default function AccountScreen({ email, visible, onClose }: Props) {
     try {
       const credential = EmailAuthProvider.credential(email, currentPw);
       await reauthenticateWithCredential(user, credential);
-      // 재인증 성공 → 새 비밀번호 입력 단계로
       setStep('new-password');
     } catch (e: any) {
       const code = e?.code ?? '';
@@ -89,7 +93,7 @@ export default function AccountScreen({ email, visible, onClose }: Props) {
       await updatePassword(user, newPw);
       Alert.alert('변경 완료', '비밀번호가 성공적으로 변경되었습니다.');
       reset();
-    } catch (e: any) {
+    } catch {
       setError('비밀번호 변경에 실패했습니다. 다시 시도해주세요.');
     } finally {
       setLoading(false);
@@ -152,7 +156,7 @@ export default function AccountScreen({ email, visible, onClose }: Props) {
                 <TextInput
                   style={s.input}
                   placeholder="현재 비밀번호"
-                  placeholderTextColor="#555"
+                  placeholderTextColor={colors.textFaint}
                   value={currentPw}
                   onChangeText={v => { setCurrentPw(v); setError(''); }}
                   secureTextEntry={!showCurrent}
@@ -196,7 +200,7 @@ export default function AccountScreen({ email, visible, onClose }: Props) {
                 <TextInput
                   style={s.input}
                   placeholder="새 비밀번호 (6자 이상)"
-                  placeholderTextColor="#555"
+                  placeholderTextColor={colors.textFaint}
                   value={newPw}
                   onChangeText={v => { setNewPw(v); setError(''); }}
                   secureTextEntry={!showNew}
@@ -212,7 +216,7 @@ export default function AccountScreen({ email, visible, onClose }: Props) {
               <TextInput
                 style={[s.input, { marginTop: 10 }]}
                 placeholder="새 비밀번호 확인"
-                placeholderTextColor="#555"
+                placeholderTextColor={colors.textFaint}
                 value={confirmPw}
                 onChangeText={v => { setConfirmPw(v); setError(''); }}
                 secureTextEntry
@@ -244,74 +248,76 @@ export default function AccountScreen({ email, visible, onClose }: Props) {
   );
 }
 
-const s = StyleSheet.create({
-  flex: { flex: 1 },
-  bg: { flex: 1, backgroundColor: '#0f0f0f' },
-  content: {
-    padding: 20,
-    paddingTop: Platform.OS === 'ios' ? 60 : 40,
-    paddingBottom: 40,
-    gap: 16,
-  },
-  header: { marginBottom: 8 },
-  backBtn: { marginBottom: 12 },
-  backTxt: { color: '#00C853', fontSize: 15 },
-  title: { color: '#fff', fontSize: 22, fontWeight: '800' },
+function makeStyles(c: Colors) {
+  return StyleSheet.create({
+    flex: { flex: 1 },
+    bg:   { flex: 1, backgroundColor: c.bg },
+    content: {
+      padding: 20,
+      paddingTop: Platform.OS === 'ios' ? 60 : 40,
+      paddingBottom: 40,
+      gap: 16,
+    },
+    header:  { marginBottom: 8 },
+    backBtn: { marginBottom: 12 },
+    backTxt: { color: c.accent, fontSize: 15 },
+    title:   { color: c.text, fontSize: 22, fontWeight: '800' },
 
-  card: { backgroundColor: '#1a1a1a', borderRadius: 20, padding: 20 },
-  fieldLabel: { color: '#666', fontSize: 12, fontWeight: '600', marginBottom: 10 },
-  fieldRow: {
-    backgroundColor: '#242424',
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 14,
-  },
-  fieldValue: { color: '#ccc', fontSize: 16 },
-  fieldHint: { color: '#444', fontSize: 11, marginTop: 8 },
+    card:       { backgroundColor: c.card, borderRadius: 20, padding: 20 },
+    fieldLabel: { color: c.textMuted, fontSize: 12, fontWeight: '600', marginBottom: 10 },
+    fieldRow: {
+      backgroundColor: c.card3,
+      borderRadius: 10,
+      paddingHorizontal: 14,
+      paddingVertical: 14,
+    },
+    fieldValue: { color: c.textSub, fontSize: 16 },
+    fieldHint:  { color: c.textFaint, fontSize: 11, marginTop: 8 },
 
-  changeBtn: {
-    marginTop: 14,
-    backgroundColor: '#2a2a2a',
-    borderRadius: 10,
-    paddingVertical: 13,
-    alignItems: 'center',
-  },
-  changeBtnTxt: { color: '#00C853', fontSize: 14, fontWeight: '700' },
+    changeBtn: {
+      marginTop: 14,
+      backgroundColor: c.card2,
+      borderRadius: 10,
+      paddingVertical: 13,
+      alignItems: 'center',
+    },
+    changeBtnTxt: { color: c.accent, fontSize: 14, fontWeight: '700' },
 
-  stepTitle: { color: '#fff', fontSize: 16, fontWeight: '700', marginBottom: 6 },
-  stepDesc: { color: '#666', fontSize: 13, marginBottom: 16, lineHeight: 20 },
+    stepTitle: { color: c.text, fontSize: 16, fontWeight: '700', marginBottom: 6 },
+    stepDesc:  { color: c.textMuted, fontSize: 13, marginBottom: 16, lineHeight: 20 },
 
-  inputRow: { flexDirection: 'row', alignItems: 'center' },
-  input: {
-    flex: 1,
-    backgroundColor: '#242424',
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 13,
-    color: '#fff',
-    fontSize: 15,
-  },
-  eyeBtn: { paddingHorizontal: 12, paddingVertical: 13 },
-  eyeTxt: { color: '#00C853', fontSize: 13 },
+    inputRow: { flexDirection: 'row', alignItems: 'center' },
+    input: {
+      flex: 1,
+      backgroundColor: c.card3,
+      borderRadius: 10,
+      paddingHorizontal: 14,
+      paddingVertical: 13,
+      color: c.text,
+      fontSize: 15,
+    },
+    eyeBtn: { paddingHorizontal: 12, paddingVertical: 13 },
+    eyeTxt: { color: c.accent, fontSize: 13 },
 
-  errorTxt: { color: '#FF453A', fontSize: 13, marginTop: 10 },
+    errorTxt: { color: '#FF453A', fontSize: 13, marginTop: 10 },
 
-  btnRow: { flexDirection: 'row', gap: 10, marginTop: 16 },
-  cancelBtn: {
-    flex: 1,
-    backgroundColor: '#2a2a2a',
-    borderRadius: 10,
-    paddingVertical: 14,
-    alignItems: 'center',
-  },
-  cancelBtnTxt: { color: '#888', fontSize: 14, fontWeight: '600' },
-  confirmBtn: {
-    flex: 2,
-    backgroundColor: '#00C853',
-    borderRadius: 10,
-    paddingVertical: 14,
-    alignItems: 'center',
-  },
-  confirmBtnTxt: { color: '#fff', fontSize: 14, fontWeight: '700' },
-  btnOff: { opacity: 0.5 },
-});
+    btnRow: { flexDirection: 'row', gap: 10, marginTop: 16 },
+    cancelBtn: {
+      flex: 1,
+      backgroundColor: c.card2,
+      borderRadius: 10,
+      paddingVertical: 14,
+      alignItems: 'center',
+    },
+    cancelBtnTxt: { color: c.textMuted, fontSize: 14, fontWeight: '600' },
+    confirmBtn: {
+      flex: 2,
+      backgroundColor: c.accent,
+      borderRadius: 10,
+      paddingVertical: 14,
+      alignItems: 'center',
+    },
+    confirmBtnTxt: { color: '#fff', fontSize: 14, fontWeight: '700' },
+    btnOff: { opacity: 0.5 },
+  });
+}

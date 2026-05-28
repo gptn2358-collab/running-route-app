@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -21,6 +21,8 @@ import {
 import * as WebBrowser from 'expo-web-browser';
 import * as Google from 'expo-auth-session/providers/google';
 import { auth } from '../config/firebase';
+import { useTheme } from '../context/ThemeContext';
+import { Colors } from '../theme';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -51,6 +53,9 @@ export default function AuthScreen({ onSuccess }: Props) {
   const [loading, setLoading]     = useState(false);
   const [error, setError]         = useState('');
   const [resetSent, setResetSent] = useState(false);
+
+  const { colors } = useTheme();
+  const s = useMemo(() => makeStyles(colors), [colors]);
 
   const [, googleResponse, promptGoogleAsync] = Google.useAuthRequest(
     GOOGLE_WEB_CLIENT_ID
@@ -179,7 +184,7 @@ export default function AuthScreen({ onSuccess }: Props) {
                 <TextInput
                   style={s.input}
                   placeholder="가입한 이메일"
-                  placeholderTextColor="#555"
+                  placeholderTextColor={colors.textFaint}
                   value={email}
                   onChangeText={v => { setEmail(v); setError(''); }}
                   keyboardType="email-address"
@@ -223,7 +228,7 @@ export default function AuthScreen({ onSuccess }: Props) {
             <TextInput
               style={s.input}
               placeholder="이메일"
-              placeholderTextColor="#555"
+              placeholderTextColor={colors.textFaint}
               value={email}
               onChangeText={v => { setEmail(v); setError(''); }}
               keyboardType="email-address"
@@ -233,7 +238,7 @@ export default function AuthScreen({ onSuccess }: Props) {
             <TextInput
               style={s.input}
               placeholder="비밀번호 (6자 이상)"
-              placeholderTextColor="#555"
+              placeholderTextColor={colors.textFaint}
               value={password}
               onChangeText={v => { setPassword(v); setError(''); }}
               secureTextEntry
@@ -252,7 +257,6 @@ export default function AuthScreen({ onSuccess }: Props) {
               }
             </TouchableOpacity>
 
-            {/* 비밀번호 찾기 링크 — 로그인 모드에서만 표시 */}
             {mode === 'login' && (
               <TouchableOpacity
                 style={s.forgotLink}
@@ -264,20 +268,17 @@ export default function AuthScreen({ onSuccess }: Props) {
           </>
         )}
 
-        {/* 구분선 + Google — reset 모드 아닐 때만 */}
         {mode !== 'reset' && (
           <>
-        {/* 구분선 */}
-        <View style={s.dividerRow}>
-          <View style={s.dividerLine} />
-          <Text style={s.dividerTxt}>또는</Text>
-          <View style={s.dividerLine} />
-        </View>
+            <View style={s.dividerRow}>
+              <View style={s.dividerLine} />
+              <Text style={s.dividerTxt}>또는</Text>
+              <View style={s.dividerLine} />
+            </View>
 
-        {/* Google */}
-        <TouchableOpacity style={s.googleBtn} onPress={handleGooglePress}>
-          <Text style={s.googleBtnTxt}>G  Google로 계속하기</Text>
-        </TouchableOpacity>
+            <TouchableOpacity style={s.googleBtn} onPress={handleGooglePress}>
+              <Text style={s.googleBtnTxt}>G  Google로 계속하기</Text>
+            </TouchableOpacity>
           </>
         )}
       </ScrollView>
@@ -285,87 +286,85 @@ export default function AuthScreen({ onSuccess }: Props) {
   );
 }
 
-const s = StyleSheet.create({
-  flex: { flex: 1 },
-  bg: { flex: 1, backgroundColor: '#0f0f0f' },
-  container: {
-    flexGrow: 1,
-    justifyContent: 'center',
-    padding: 28,
-    paddingBottom: Platform.OS === 'ios' ? 50 : 30,
-  },
-  emoji: { fontSize: 56, textAlign: 'center', marginBottom: 10 },
-  title: {
-    color: '#fff', fontSize: 26, fontWeight: '800',
-    textAlign: 'center', marginBottom: 6,
-  },
-  subtitle: {
-    color: '#666', fontSize: 14,
-    textAlign: 'center', marginBottom: 32,
-  },
-  tabs: {
-    flexDirection: 'row',
-    backgroundColor: '#1a1a1a',
-    borderRadius: 14,
-    padding: 4,
-    marginBottom: 20,
-  },
-  tab: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 10 },
-  tabOn: { backgroundColor: '#2a2a2a' },
-  tabTxt: { color: '#555', fontSize: 14, fontWeight: '600' },
-  tabTxtOn: { color: '#fff' },
-  input: {
-    backgroundColor: '#1a1a1a',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    color: '#fff',
-    fontSize: 16,
-    marginBottom: 12,
-  },
-  errorTxt: { color: '#FF453A', fontSize: 13, marginBottom: 12, textAlign: 'center' },
-  mainBtn: {
-    backgroundColor: '#00C853',
-    borderRadius: 14,
-    paddingVertical: 16,
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  mainBtnOff: { opacity: 0.5 },
-  mainBtnTxt: { color: '#fff', fontSize: 16, fontWeight: '700' },
-  dividerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 20,
-    gap: 10,
-  },
-  dividerLine: { flex: 1, height: 1, backgroundColor: '#2a2a2a' },
-  dividerTxt: { color: '#444', fontSize: 13 },
-  googleBtn: {
-    backgroundColor: '#1a1a1a',
-    borderRadius: 14,
-    paddingVertical: 16,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#2a2a2a',
-  },
-  googleBtnTxt: { color: '#ddd', fontSize: 15, fontWeight: '600' },
+function makeStyles(c: Colors) {
+  return StyleSheet.create({
+    flex: { flex: 1 },
+    bg:   { flex: 1, backgroundColor: c.bg },
+    container: {
+      flexGrow: 1,
+      justifyContent: 'center',
+      padding: 28,
+      paddingBottom: Platform.OS === 'ios' ? 50 : 30,
+    },
+    emoji: { fontSize: 56, textAlign: 'center', marginBottom: 10 },
+    title: {
+      color: c.text, fontSize: 26, fontWeight: '800',
+      textAlign: 'center', marginBottom: 6,
+    },
+    subtitle: {
+      color: c.textMuted, fontSize: 14,
+      textAlign: 'center', marginBottom: 32,
+    },
+    tabs: {
+      flexDirection: 'row',
+      backgroundColor: c.card,
+      borderRadius: 14,
+      padding: 4,
+      marginBottom: 20,
+    },
+    tab:      { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 10 },
+    tabOn:    { backgroundColor: c.card2 },
+    tabTxt:   { color: c.textFaint, fontSize: 14, fontWeight: '600' },
+    tabTxtOn: { color: c.text },
+    input: {
+      backgroundColor: c.card,
+      borderRadius: 12,
+      paddingHorizontal: 16,
+      paddingVertical: 14,
+      color: c.text,
+      fontSize: 16,
+      marginBottom: 12,
+    },
+    errorTxt: { color: '#FF453A', fontSize: 13, marginBottom: 12, textAlign: 'center' },
+    mainBtn: {
+      backgroundColor: c.accent,
+      borderRadius: 14,
+      paddingVertical: 16,
+      alignItems: 'center',
+      marginBottom: 20,
+    },
+    mainBtnOff: { opacity: 0.5 },
+    mainBtnTxt: { color: '#fff', fontSize: 16, fontWeight: '700' },
+    dividerRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 20,
+      gap: 10,
+    },
+    dividerLine: { flex: 1, height: 1, backgroundColor: c.border },
+    dividerTxt:  { color: c.textFaint, fontSize: 13 },
+    googleBtn: {
+      backgroundColor: c.card,
+      borderRadius: 14,
+      paddingVertical: 16,
+      alignItems: 'center',
+      borderWidth: 1,
+      borderColor: c.border,
+    },
+    googleBtnTxt: { color: c.textSub, fontSize: 15, fontWeight: '600' },
 
-  forgotLink: { alignItems: 'center', paddingVertical: 12 },
-  forgotTxt: { color: '#00C853', fontSize: 14 },
+    forgotLink:  { alignItems: 'center', paddingVertical: 12 },
+    forgotTxt:   { color: c.accent, fontSize: 14 },
 
-  backLink: { marginBottom: 24 },
-  backLinkTxt: { color: '#00C853', fontSize: 14 },
+    backLink:    { marginBottom: 24 },
+    backLinkTxt: { color: c.accent, fontSize: 14 },
 
-  resetTitle: { color: '#fff', fontSize: 20, fontWeight: '800', marginBottom: 8 },
-  resetDesc: {
-    color: '#666', fontSize: 14, lineHeight: 22, marginBottom: 24,
-  },
+    resetTitle: { color: c.text, fontSize: 20, fontWeight: '800', marginBottom: 8 },
+    resetDesc:  { color: c.textMuted, fontSize: 14, lineHeight: 22, marginBottom: 24 },
 
-  sentBox: { alignItems: 'center', gap: 12, paddingVertical: 8 },
-  sentIcon: { fontSize: 48 },
-  sentTitle: { color: '#fff', fontSize: 18, fontWeight: '700' },
-  sentDesc: {
-    color: '#888', fontSize: 14, textAlign: 'center', lineHeight: 22,
-  },
-});
+    sentBox:  { alignItems: 'center', gap: 12, paddingVertical: 8 },
+    sentIcon: { fontSize: 48 },
+    sentTitle: { color: c.text, fontSize: 18, fontWeight: '700' },
+    sentDesc:  { color: c.textMuted, fontSize: 14, textAlign: 'center', lineHeight: 22 },
+  });
+}

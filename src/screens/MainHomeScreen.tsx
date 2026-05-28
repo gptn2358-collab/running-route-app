@@ -1,11 +1,13 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
   ScrollView, Platform,
 } from 'react-native';
-import { UserProfile, RunRecord } from '../types';
+import { UserProfile } from '../types';
 import { getUserRunHistory } from '../services/rankingService';
 import { getMonthlyRanking, getMonthKey, formatMonthLabel } from '../services/rankingService';
+import { useTheme } from '../context/ThemeContext';
+import { Colors } from '../theme';
 
 interface Props {
   profile: UserProfile | null;
@@ -40,6 +42,9 @@ function greeting() {
 export default function MainHomeScreen({ profile, onStartRun }: Props) {
   const [monthStats, setMonthStats] = useState<MonthStats | null>(null);
   const [myLongRank, setMyLongRank] = useState<number | null>(null);
+
+  const { colors } = useTheme();
+  const s = useMemo(() => makeStyles(colors), [colors]);
 
   const month = getMonthKey();
 
@@ -139,58 +144,56 @@ export default function MainHomeScreen({ profile, onStartRun }: Props) {
   );
 }
 
-const s = StyleSheet.create({
-  bg: { flex: 1, backgroundColor: '#0f0f0f' },
-  content: {
-    padding: 20,
-    paddingTop: Platform.OS === 'ios' ? 60 : 40,
-    paddingBottom: 20,
-    gap: 16,
-  },
+function makeStyles(c: Colors) {
+  return StyleSheet.create({
+    bg: { flex: 1, backgroundColor: c.bg },
+    content: {
+      padding: 20,
+      paddingTop: Platform.OS === 'ios' ? 60 : 40,
+      paddingBottom: 20,
+      gap: 16,
+    },
 
-  header: { marginBottom: 4 },
-  dateLabel: { color: '#555', fontSize: 13, marginBottom: 4 },
-  greetingName: { color: '#fff', fontSize: 26, fontWeight: '800', marginBottom: 4 },
-  greetingMsg: { color: '#888', fontSize: 14 },
+    header:       { marginBottom: 4 },
+    dateLabel:    { color: c.textFaint, fontSize: 13, marginBottom: 4 },
+    greetingName: { color: c.text, fontSize: 26, fontWeight: '800', marginBottom: 4 },
+    greetingMsg:  { color: c.textMuted, fontSize: 14 },
 
-  card: {
-    backgroundColor: '#1a1a1a',
-    borderRadius: 20,
-    padding: 20,
-  },
-  cardTitle: { color: '#666', fontSize: 12, fontWeight: '600', marginBottom: 14 },
+    card:      { backgroundColor: c.card, borderRadius: 20, padding: 20 },
+    cardTitle: { color: c.textMuted, fontSize: 12, fontWeight: '600', marginBottom: 14 },
 
-  statsRow: { flexDirection: 'row', alignItems: 'center' },
-  statItem: { flex: 1, alignItems: 'center' },
-  statBig: { color: '#00C853', fontSize: 24, fontWeight: '800' },
-  statUnit: { color: '#555', fontSize: 12 },
-  statLbl: { color: '#666', fontSize: 11, marginTop: 2 },
-  statDivider: { width: 1, height: 40, backgroundColor: '#2a2a2a' },
-  emptyStats: { color: '#555', fontSize: 13, lineHeight: 20, textAlign: 'center', paddingVertical: 8 },
+    statsRow:    { flexDirection: 'row', alignItems: 'center' },
+    statItem:    { flex: 1, alignItems: 'center' },
+    statBig:     { color: c.accent, fontSize: 24, fontWeight: '800' },
+    statUnit:    { color: c.textFaint, fontSize: 12 },
+    statLbl:     { color: c.textMuted, fontSize: 11, marginTop: 2 },
+    statDivider: { width: 1, height: 40, backgroundColor: c.border },
+    emptyStats:  { color: c.textFaint, fontSize: 13, lineHeight: 20, textAlign: 'center', paddingVertical: 8 },
 
-  startBtn: {
-    backgroundColor: '#00C853',
-    borderRadius: 20,
-    paddingVertical: 20,
-    paddingHorizontal: 28,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  startIcon: { fontSize: 26, marginRight: 12 },
-  startTxt: { flex: 1, color: '#fff', fontSize: 18, fontWeight: '800' },
-  startArrow: { color: '#fff', fontSize: 20, fontWeight: '700' },
+    startBtn: {
+      backgroundColor: c.accent,
+      borderRadius: 20,
+      paddingVertical: 20,
+      paddingHorizontal: 28,
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    startIcon:  { fontSize: 26, marginRight: 12 },
+    startTxt:   { flex: 1, color: '#fff', fontSize: 18, fontWeight: '800' },
+    startArrow: { color: '#fff', fontSize: 20, fontWeight: '700' },
 
-  rankCard: {
-    backgroundColor: '#1a1a1a',
-    borderRadius: 20,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: '#2a2a2a',
-  },
-  rankCardInvite: { borderColor: '#2a3a2a' },
-  rankCardTitle: { color: '#aaa', fontSize: 13, fontWeight: '700', marginBottom: 12 },
-  rankRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 },
-  rankLabel: { color: '#777', fontSize: 14 },
-  rankValue: { color: '#00C853', fontSize: 14, fontWeight: '700' },
-  rankHint: { color: '#444', fontSize: 12, lineHeight: 18 },
-});
+    rankCard: {
+      backgroundColor: c.card,
+      borderRadius: 20,
+      padding: 20,
+      borderWidth: 1,
+      borderColor: c.border,
+    },
+    rankCardInvite: { borderColor: c.accentBorder },
+    rankCardTitle:  { color: c.textSub, fontSize: 13, fontWeight: '700', marginBottom: 12 },
+    rankRow:        { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 },
+    rankLabel:      { color: c.textMuted, fontSize: 14 },
+    rankValue:      { color: c.accent, fontSize: 14, fontWeight: '700' },
+    rankHint:       { color: c.textFaint, fontSize: 12, lineHeight: 18 },
+  });
+}

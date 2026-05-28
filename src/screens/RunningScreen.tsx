@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -21,13 +21,15 @@ import { generateBestRoutes, getDirectRoute } from '../services/routingService';
 import { findNearestBathroom } from '../services/bathroomService';
 import SignalOverlay from '../components/SignalOverlay';
 import LeafletMap, { LeafletMapHandle, SignalInfo } from '../components/LeafletMap';
+import { useTheme } from '../context/ThemeContext';
+import { Colors } from '../theme';
 
 // ── 재탐색 임계값 ──────────────────────────────────────────────
-const DEVIATION_THRESHOLD_M = 50;    // 경로에서 50m 이상 이탈
-const DEVIATION_TRIGGER_MS  = 10_000; // 10초 이상 지속 시 재탐색
-const REROUTE_COOLDOWN_MS   = 90_000; // 재탐색 후 90초 쿨다운
-const REDLIGHT_APPROACH_M   = 80;    // 빨간불 80m 이내 접근 시 재탐색
-const REDLIGHT_COOLDOWN_MS  = 120_000; // 빨간불 재탐색 2분 쿨다운
+const DEVIATION_THRESHOLD_M = 50;
+const DEVIATION_TRIGGER_MS  = 10_000;
+const REROUTE_COOLDOWN_MS   = 90_000;
+const REDLIGHT_APPROACH_M   = 80;
+const REDLIGHT_COOLDOWN_MS  = 120_000;
 
 interface Props {
   route: RouteCandidate;
@@ -37,22 +39,22 @@ interface Props {
 
 export default function RunningScreen({ route: initialRoute, start, onFinish }: Props) {
   const [currentRoute, setCurrentRoute] = useState<RouteCandidate>(initialRoute);
-  const [trail, setTrail]     = useState<Coordinate[]>([start]);
   const [coveredM, setCoveredM] = useState(0);
   const [elapsed, setElapsed]   = useState(0);
   const [paused, setPaused]     = useState(false);
   const [rerouteMsg, setRerouteMsg] = useState<string | null>(null);
 
-  // V2X signal state
-  const [nearSignal, setNearSignal]     = useState<IntersectionSignal | null>(null);
+  const [nearSignal, setNearSignal]         = useState<IntersectionSignal | null>(null);
   const [nearSignalDist, setNearSignalDist] = useState<number | null>(null);
 
-  // 화장실 안내
-  const [bathroomMode, setBathroomMode]       = useState(false);
+  const [bathroomMode, setBathroomMode]           = useState(false);
   const [bathroomSearching, setBathroomSearching] = useState(false);
-  const [bathroomDist, setBathroomDist]       = useState<number | null>(null);
-  const bathroomModeRef  = useRef(false);
-  const bathroomDestRef  = useRef<Coordinate | null>(null);
+  const [bathroomDist, setBathroomDist]           = useState<number | null>(null);
+  const bathroomModeRef = useRef(false);
+  const bathroomDestRef = useRef<Coordinate | null>(null);
+
+  const { colors } = useTheme();
+  const s = useMemo(() => makeStyles(colors), [colors]);
 
   const leafletRef   = useRef<LeafletMapHandle>(null);
   const locSub       = useRef<Location.LocationSubscription | null>(null);
@@ -73,13 +75,11 @@ export default function RunningScreen({ route: initialRoute, start, onFinish }: 
   const spatRecordsRef = useRef<IntersectionSignal[]>([]);
   const currentRouteRef = useRef<RouteCandidate>(initialRoute);
 
-  // 재탐색 제어
-  const reroutingRef        = useRef(false);
-  const lastRerouteRef      = useRef(0);
-  const lastRedLightRef     = useRef(0);
-  const offRouteSinceRef    = useRef<number | null>(null);
+  const reroutingRef     = useRef(false);
+  const lastRerouteRef   = useRef(0);
+  const lastRedLightRef  = useRef(0);
+  const offRouteSinceRef = useRef<number | null>(null);
 
-  // currentRoute 변경 시 ref 동기화
   useEffect(() => { currentRouteRef.current = currentRoute; }, [currentRoute]);
   useEffect(() => { coveredMRef.current = coveredM; }, [coveredM]);
 
@@ -149,7 +149,6 @@ export default function RunningScreen({ route: initialRoute, start, onFinish }: 
       setCurrentRoute(best);
       currentRouteRef.current = best;
 
-      // 지도 업데이트
       leafletRef.current?.setRoute(best.polyline);
       leafletRef.current?.resetSignals(buildInitialSignals(best));
 
@@ -181,7 +180,6 @@ export default function RunningScreen({ route: initialRoute, start, onFinish }: 
     setNearSignal(nearSig);
     setNearSignalDist(within ? minDist : null);
 
-    // V2X 실데이터 빨간불 80m 이내 접근 시 재탐색
     if (
       within &&
       minDist !== null && minDist <= REDLIGHT_APPROACH_M &&
@@ -195,7 +193,6 @@ export default function RunningScreen({ route: initialRoute, start, onFinish }: 
       }
     }
 
-    // 신호 마커 업데이트
     const signals: SignalInfo[] = lights.map((loc, i) => {
       let matchedRecord: IntersectionSignal | null = null;
 
@@ -252,12 +249,10 @@ export default function RunningScreen({ route: initialRoute, start, onFinish }: 
         posRef.current     = newPos;
         const newTrail = [...trailRef.current, newPos];
         trailRef.current = newTrail;
-        setTrail(newTrail);
         const newCovered = coveredMRef.current + delta;
         coveredMRef.current = newCovered;
         setCoveredM(newCovered);
 
-        // Record a segment every completed km
         const completedKm = Math.floor(newCovered / 1000);
         if (completedKm > lastSegKmRef.current) {
           for (let km = lastSegKmRef.current + 1; km <= completedKm; km++) {
@@ -280,7 +275,6 @@ export default function RunningScreen({ route: initialRoute, start, onFinish }: 
         leafletRef.current?.updateRunner(newPos, newTrail);
         updateNearSignal(newPos, spatRecordsRef.current);
 
-        // 화장실 안내 중 — 도착 감지 및 이탈 감지 스킵
         if (bathroomModeRef.current && bathroomDestRef.current) {
           const d = haversineDistance(newPos, bathroomDestRef.current);
           setBathroomDist(Math.round(d));
@@ -295,7 +289,6 @@ export default function RunningScreen({ route: initialRoute, start, onFinish }: 
           return;
         }
 
-        // 경로 이탈 감지
         const distFromRoute = distToPolyline(newPos, currentRouteRef.current.polyline);
         if (distFromRoute > DEVIATION_THRESHOLD_M) {
           if (offRouteSinceRef.current === null) {
@@ -313,7 +306,6 @@ export default function RunningScreen({ route: initialRoute, start, onFinish }: 
 
   async function handleBathroom() {
     if (bathroomMode) {
-      // 화장실 모드 종료 → 원래 경로로 복귀
       setBathroomMode(false);
       bathroomModeRef.current = false;
       bathroomDestRef.current = null;
@@ -466,70 +458,72 @@ export default function RunningScreen({ route: initialRoute, start, onFinish }: 
   );
 }
 
-const s = StyleSheet.create({
-  container: { flex: 1 },
-  bathroomBanner: {
-    position: 'absolute',
-    top: Platform.OS === 'ios' ? 148 : 110,
-    alignSelf: 'center',
-    backgroundColor: '#FF9500',
-    paddingHorizontal: 20,
-    paddingVertical: 8,
-    borderRadius: 20,
-    zIndex: 99,
-  },
-  bathroomTxt: { color: '#fff', fontSize: 14, fontWeight: '700' },
-  rerouteBanner: {
-    position: 'absolute',
-    top: Platform.OS === 'ios' ? 120 : 82,
-    alignSelf: 'center',
-    backgroundColor: 'rgba(10,10,10,0.92)',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 22,
-    zIndex: 99,
-  },
-  rerouteTxt: { color: '#fff', fontSize: 14, fontWeight: '700' },
-  statsCard: {
-    position: 'absolute',
-    top: Platform.OS === 'ios' ? 58 : 20,
-    left: 14, right: 14,
-    backgroundColor: 'rgba(10,10,10,0.88)',
-    borderRadius: 18,
-    padding: 16,
-  },
-  statsRow: { flexDirection: 'row', marginBottom: 12 },
-  stat: { flex: 1, alignItems: 'center' },
-  statVal: { color: '#fff', fontSize: 22, fontWeight: '800' },
-  statLbl: { color: '#777', fontSize: 11, marginTop: 2 },
-  div: { width: 1, backgroundColor: '#333', marginHorizontal: 4 },
-  progBg:   { height: 5, backgroundColor: '#2a2a2a', borderRadius: 3, marginBottom: 6 },
-  progFill: { height: 5, backgroundColor: '#00C853', borderRadius: 3 },
-  progTxt:  { color: '#666', fontSize: 11, textAlign: 'center' },
-  pausedBadge: {
-    color: '#FFD60A', textAlign: 'center',
-    marginTop: 6, fontSize: 13, fontWeight: '600',
-  },
-  controls: {
-    position: 'absolute',
-    bottom: Platform.OS === 'ios' ? 50 : 28,
-    left: 14, right: 14,
-    flexDirection: 'row', gap: 12,
-  },
-  ctrlBtn: { flex: 1, paddingVertical: 16, borderRadius: 14, alignItems: 'center' },
-  ctrlBtnOutline: {
-    backgroundColor: 'rgba(10,10,10,0.88)',
-    borderWidth: 1.5, borderColor: '#00C853',
-  },
-  ctrlBtnOutlineTxt: { color: '#00C853', fontSize: 15, fontWeight: '700' },
-  ctrlBtnWc: {
-    backgroundColor: 'rgba(255,149,0,0.85)',
-    flex: 0,
-    width: 52,
-    borderRadius: 14,
-  },
-  ctrlBtnWcActive: { backgroundColor: '#666' },
-  ctrlBtnWcTxt: { color: '#fff', fontSize: 22 },
-  ctrlBtnStop: { backgroundColor: '#FF453A' },
-  ctrlBtnStopTxt: { color: '#fff', fontSize: 15, fontWeight: '700' },
-});
+function makeStyles(c: Colors) {
+  return StyleSheet.create({
+    container: { flex: 1 },
+    bathroomBanner: {
+      position: 'absolute',
+      top: Platform.OS === 'ios' ? 148 : 110,
+      alignSelf: 'center',
+      backgroundColor: '#FF9500',
+      paddingHorizontal: 20,
+      paddingVertical: 8,
+      borderRadius: 20,
+      zIndex: 99,
+    },
+    bathroomTxt:  { color: '#fff', fontSize: 14, fontWeight: '700' },
+    rerouteBanner: {
+      position: 'absolute',
+      top: Platform.OS === 'ios' ? 120 : 82,
+      alignSelf: 'center',
+      backgroundColor: c.overlay,
+      paddingHorizontal: 20,
+      paddingVertical: 10,
+      borderRadius: 22,
+      zIndex: 99,
+    },
+    rerouteTxt: { color: c.text, fontSize: 14, fontWeight: '700' },
+    statsCard: {
+      position: 'absolute',
+      top: Platform.OS === 'ios' ? 58 : 20,
+      left: 14, right: 14,
+      backgroundColor: c.overlay,
+      borderRadius: 18,
+      padding: 16,
+    },
+    statsRow: { flexDirection: 'row', marginBottom: 12 },
+    stat:     { flex: 1, alignItems: 'center' },
+    statVal:  { color: c.text, fontSize: 22, fontWeight: '800' },
+    statLbl:  { color: c.textMuted, fontSize: 11, marginTop: 2 },
+    div:      { width: 1, backgroundColor: c.divider, marginHorizontal: 4 },
+    progBg:   { height: 5, backgroundColor: c.card2, borderRadius: 3, marginBottom: 6 },
+    progFill: { height: 5, backgroundColor: c.accent, borderRadius: 3 },
+    progTxt:  { color: c.textMuted, fontSize: 11, textAlign: 'center' },
+    pausedBadge: {
+      color: '#FFD60A', textAlign: 'center',
+      marginTop: 6, fontSize: 13, fontWeight: '600',
+    },
+    controls: {
+      position: 'absolute',
+      bottom: Platform.OS === 'ios' ? 50 : 28,
+      left: 14, right: 14,
+      flexDirection: 'row', gap: 12,
+    },
+    ctrlBtn:        { flex: 1, paddingVertical: 16, borderRadius: 14, alignItems: 'center' },
+    ctrlBtnOutline: {
+      backgroundColor: c.overlay,
+      borderWidth: 1.5, borderColor: c.accent,
+    },
+    ctrlBtnOutlineTxt: { color: c.accent, fontSize: 15, fontWeight: '700' },
+    ctrlBtnWc: {
+      backgroundColor: 'rgba(255,149,0,0.85)',
+      flex: 0,
+      width: 52,
+      borderRadius: 14,
+    },
+    ctrlBtnWcActive: { backgroundColor: '#666' },
+    ctrlBtnWcTxt:    { color: '#fff', fontSize: 22 },
+    ctrlBtnStop:     { backgroundColor: '#FF453A' },
+    ctrlBtnStopTxt:  { color: '#fff', fontSize: 15, fontWeight: '700' },
+  });
+}

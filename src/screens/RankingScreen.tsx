@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,8 @@ import {
 } from 'react-native';
 import { UserProfile, RankingEntry, MonthlyRanking } from '../types';
 import { getMonthlyRanking, getMonthKey, formatMonthLabel } from '../services/rankingService';
+import { useTheme } from '../context/ThemeContext';
+import { Colors } from '../theme';
 
 interface Props {
   profile: UserProfile | null;
@@ -21,25 +23,26 @@ type Tab = 'long' | 'off';
 
 const MEDAL = ['🥇', '🥈', '🥉'];
 
-function RankRow({ entry, tab }: { entry: RankingEntry; tab: Tab }) {
+function RankRow({ entry, tab, colors }: { entry: RankingEntry; tab: Tab; colors: Colors }) {
   const medal = entry.rank <= 3 ? MEDAL[entry.rank - 1] : null;
   const valueLabel = tab === 'long'
     ? `${entry.valueKm.toFixed(1)} km`
     : `${entry.valueCount}회`;
+  const row = useMemo(() => makeRowStyles(colors), [colors]);
   return (
-    <View style={[s.row, entry.isCurrentUser && s.rowMe]}>
-      <View style={s.rankCell}>
+    <View style={[row.row, entry.isCurrentUser && row.rowMe]}>
+      <View style={row.rankCell}>
         {medal ? (
-          <Text style={s.medal}>{medal}</Text>
+          <Text style={row.medal}>{medal}</Text>
         ) : (
-          <Text style={s.rankNum}>{entry.rank}</Text>
+          <Text style={row.rankNum}>{entry.rank}</Text>
         )}
       </View>
-      <Text style={[s.nicknameText, entry.isCurrentUser && s.nickMe]} numberOfLines={1}>
+      <Text style={[row.nicknameText, entry.isCurrentUser && row.nickMe]} numberOfLines={1}>
         {entry.nickname}
-        {entry.isCurrentUser && <Text style={s.meTag}> 나</Text>}
+        {entry.isCurrentUser && <Text style={row.meTag}> 나</Text>}
       </Text>
-      <Text style={[s.valueText, entry.isCurrentUser && s.valueMe]}>
+      <Text style={[row.valueText, entry.isCurrentUser && row.valueMe]}>
         {valueLabel}
       </Text>
     </View>
@@ -47,9 +50,12 @@ function RankRow({ entry, tab }: { entry: RankingEntry; tab: Tab }) {
 }
 
 export default function RankingScreen({ profile, onBack, onSetupProfile }: Props) {
-  const [tab, setTab] = useState<Tab>('long');
+  const [tab, setTab]       = useState<Tab>('long');
   const [ranking, setRanking] = useState<MonthlyRanking | null>(null);
   const [loading, setLoading] = useState(true);
+
+  const { colors } = useTheme();
+  const s = useMemo(() => makeStyles(colors), [colors]);
 
   const month = getMonthKey();
 
@@ -142,12 +148,12 @@ export default function RankingScreen({ profile, onBack, onSetupProfile }: Props
 
         {/* Ranking list */}
         {loading ? (
-          <ActivityIndicator color="#00C853" style={s.loader} />
+          <ActivityIndicator color={colors.accent} style={s.loader} />
         ) : entries.length === 0 ? (
           <Text style={s.empty}>이달 기록이 아직 없습니다</Text>
         ) : (
           <View style={s.listCard}>
-            {entries.map(e => <RankRow key={e.rank} entry={e} tab={tab} />)}
+            {entries.map(e => <RankRow key={e.rank} entry={e} tab={tab} colors={colors} />)}
           </View>
         )}
 
@@ -191,161 +197,149 @@ export default function RankingScreen({ profile, onBack, onSetupProfile }: Props
   );
 }
 
-const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0f0f0f' },
+function makeRowStyles(c: Colors) {
+  return StyleSheet.create({
+    row: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 14,
+      paddingHorizontal: 16,
+      borderBottomWidth: 1,
+      borderBottomColor: c.card3,
+    },
+    rowMe:        { backgroundColor: c.rowMeBg },
+    rankCell:     { width: 36, alignItems: 'center' },
+    medal:        { fontSize: 22 },
+    rankNum:      { color: c.textMuted, fontSize: 15, fontWeight: '700' },
+    nicknameText: { flex: 1, color: c.textSub, fontSize: 15, marginLeft: 4 },
+    nickMe:       { color: c.accent, fontWeight: '700' },
+    meTag:        { color: c.accent, fontSize: 12, fontWeight: '700' },
+    valueText:    { color: c.textMuted, fontSize: 14, fontWeight: '600' },
+    valueMe:      { color: c.accent },
+  });
+}
 
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingTop: Platform.OS === 'ios' ? 58 : 20,
-    paddingHorizontal: 16,
-    paddingBottom: 14,
-  },
-  backBtn: { width: 40 },
-  backTxt: { color: '#00C853', fontSize: 24, fontWeight: '600' },
-  headerCenter: { flex: 1, alignItems: 'center' },
-  headerTitle: { color: '#fff', fontSize: 18, fontWeight: '800' },
-  headerSub: { color: '#666', fontSize: 12, marginTop: 2 },
+function makeStyles(c: Colors) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: c.bg },
 
-  tabs: {
-    flexDirection: 'row',
-    marginHorizontal: 16,
-    backgroundColor: '#1a1a1a',
-    borderRadius: 14,
-    padding: 4,
-    marginBottom: 16,
-  },
-  tab: {
-    flex: 1,
-    paddingVertical: 10,
-    alignItems: 'center',
-    borderRadius: 10,
-  },
-  tabOn: { backgroundColor: '#2a2a2a' },
-  tabTxt: { color: '#555', fontSize: 14, fontWeight: '600' },
-  tabTxtOn: { color: '#fff' },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingTop: Platform.OS === 'ios' ? 58 : 20,
+      paddingHorizontal: 16,
+      paddingBottom: 14,
+    },
+    backBtn:      { width: 40 },
+    backTxt:      { color: c.accent, fontSize: 24, fontWeight: '600' },
+    headerCenter: { flex: 1, alignItems: 'center' },
+    headerTitle:  { color: c.text, fontSize: 18, fontWeight: '800' },
+    headerSub:    { color: c.textMuted, fontSize: 12, marginTop: 2 },
 
-  scroll: { flex: 1 },
-  scrollContent: { padding: 16, paddingBottom: 40 },
+    tabs: {
+      flexDirection: 'row',
+      marginHorizontal: 16,
+      backgroundColor: c.card,
+      borderRadius: 14,
+      padding: 4,
+      marginBottom: 16,
+    },
+    tab:      { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 10 },
+    tabOn:    { backgroundColor: c.card2 },
+    tabTxt:   { color: c.textFaint, fontSize: 14, fontWeight: '600' },
+    tabTxtOn: { color: c.text },
 
-  descCard: {
-    backgroundColor: '#1a1a1a',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 16,
-  },
-  descCardOff: { backgroundColor: '#1a1209', borderWidth: 1, borderColor: '#3a2a0a' },
-  descTitle: { color: '#00C853', fontSize: 14, fontWeight: '700', marginBottom: 6 },
-  descTitleOff: { color: '#FFD60A' },
-  descText: { color: '#777', fontSize: 13, lineHeight: 20 },
-  descTextOff: { color: '#9a8060' },
-  offBadge: {
-    alignSelf: 'flex-start',
-    backgroundColor: '#2a2209',
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    marginTop: 10,
-  },
-  offBadgeTxt: { color: '#FFD60A', fontSize: 11, fontWeight: '600' },
+    scroll:        { flex: 1 },
+    scrollContent: { padding: 16, paddingBottom: 40 },
 
-  championCard: {
-    backgroundColor: '#1a2a1a',
-    borderRadius: 20,
-    padding: 24,
-    alignItems: 'center',
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#00C853',
-  },
-  championCardOff: {
-    backgroundColor: '#2a2210',
-    borderColor: '#FFD60A',
-  },
-  championEmoji: { fontSize: 40, marginBottom: 6 },
-  championLabel: { color: '#888', fontSize: 12, marginBottom: 6 },
-  championName: {
-    color: '#fff',
-    fontSize: 22,
-    fontWeight: '800',
-    marginBottom: 4,
-    textAlign: 'center',
-  },
-  championValue: { color: '#00C853', fontSize: 17, fontWeight: '700' },
+    descCard:    { backgroundColor: c.card, borderRadius: 16, padding: 16, marginBottom: 16 },
+    descCardOff: { backgroundColor: c.offBg, borderWidth: 1, borderColor: c.offBorder },
+    descTitle:   { color: c.accent, fontSize: 14, fontWeight: '700', marginBottom: 6 },
+    descTitleOff: { color: '#FFD60A' },
+    descText:    { color: c.textMuted, fontSize: 13, lineHeight: 20 },
+    descTextOff: { color: c.textMuted, fontSize: 13, lineHeight: 20 },
+    offBadge: {
+      alignSelf: 'flex-start',
+      backgroundColor: c.offBadgeBg,
+      borderRadius: 8,
+      paddingHorizontal: 10,
+      paddingVertical: 4,
+      marginTop: 10,
+    },
+    offBadgeTxt: { color: '#FFD60A', fontSize: 11, fontWeight: '600' },
 
-  loader: { marginTop: 40 },
-  empty: {
-    color: '#555',
-    textAlign: 'center',
-    marginTop: 40,
-    fontSize: 14,
-  },
+    championCard: {
+      backgroundColor: c.rankBg,
+      borderRadius: 20,
+      padding: 24,
+      alignItems: 'center',
+      marginBottom: 16,
+      borderWidth: 1,
+      borderColor: c.accent,
+    },
+    championCardOff: {
+      backgroundColor: c.offBg,
+      borderColor: '#FFD60A',
+    },
+    championEmoji: { fontSize: 40, marginBottom: 6 },
+    championLabel: { color: c.textMuted, fontSize: 12, marginBottom: 6 },
+    championName:  {
+      color: c.text,
+      fontSize: 22,
+      fontWeight: '800',
+      marginBottom: 4,
+      textAlign: 'center',
+    },
+    championValue: { color: c.accent, fontSize: 17, fontWeight: '700' },
+    nickMe:        { color: c.accent, fontWeight: '700' },
 
-  listCard: {
-    backgroundColor: '#1a1a1a',
-    borderRadius: 16,
-    overflow: 'hidden',
-    marginBottom: 16,
-  },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#242424',
-  },
-  rowMe: { backgroundColor: '#0d2018' },
-  rankCell: { width: 36, alignItems: 'center' },
-  medal: { fontSize: 22 },
-  rankNum: { color: '#666', fontSize: 15, fontWeight: '700' },
-  nicknameText: { flex: 1, color: '#ccc', fontSize: 15, marginLeft: 4 },
-  nickMe: { color: '#00C853', fontWeight: '700' },
-  meTag: { color: '#00C853', fontSize: 12, fontWeight: '700' },
-  valueText: { color: '#777', fontSize: 14, fontWeight: '600' },
-  valueMe: { color: '#00C853' },
+    loader: { marginTop: 40 },
+    empty:  { color: c.textFaint, textAlign: 'center', marginTop: 40, fontSize: 14 },
 
-  ctaCard: {
-    backgroundColor: '#1a1a1a',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#2a2a2a',
-    alignItems: 'center',
-  },
-  ctaTitle: { color: '#fff', fontSize: 16, fontWeight: '700', marginBottom: 8 },
-  ctaDesc: {
-    color: '#666',
-    fontSize: 13,
-    textAlign: 'center',
-    lineHeight: 20,
-    marginBottom: 16,
-  },
-  ctaBtn: {
-    backgroundColor: '#00C853',
-    borderRadius: 10,
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-  },
-  ctaBtnTxt: { color: '#fff', fontSize: 14, fontWeight: '700' },
+    listCard: {
+      backgroundColor: c.card,
+      borderRadius: 16,
+      overflow: 'hidden',
+      marginBottom: 16,
+    },
 
-  myPositionCard: {
-    backgroundColor: '#1a1a1a',
-    borderRadius: 16,
-    padding: 20,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#2a2a2a',
-  },
-  myPositionLabel: { color: '#666', fontSize: 12, fontWeight: '600', marginBottom: 4 },
-  myPositionRank: { color: '#00C853', fontSize: 32, fontWeight: '800' },
-  myPositionKm: { color: '#aaa', fontSize: 16, fontWeight: '600', marginTop: 2, marginBottom: 8 },
-  myPositionHint: { color: '#555', fontSize: 12 },
-  myPositionTxt: {
-    color: '#555',
-    fontSize: 13,
-    textAlign: 'center',
-    lineHeight: 20,
-  },
-});
+    ctaCard: {
+      backgroundColor: c.card,
+      borderRadius: 16,
+      padding: 20,
+      marginBottom: 12,
+      borderWidth: 1,
+      borderColor: c.border,
+      alignItems: 'center',
+    },
+    ctaTitle: { color: c.text, fontSize: 16, fontWeight: '700', marginBottom: 8 },
+    ctaDesc:  {
+      color: c.textMuted,
+      fontSize: 13,
+      textAlign: 'center',
+      lineHeight: 20,
+      marginBottom: 16,
+    },
+    ctaBtn: {
+      backgroundColor: c.accent,
+      borderRadius: 10,
+      paddingVertical: 10,
+      paddingHorizontal: 20,
+    },
+    ctaBtnTxt: { color: '#fff', fontSize: 14, fontWeight: '700' },
+
+    myPositionCard: {
+      backgroundColor: c.card,
+      borderRadius: 16,
+      padding: 20,
+      alignItems: 'center',
+      borderWidth: 1,
+      borderColor: c.border,
+    },
+    myPositionLabel: { color: c.textMuted, fontSize: 12, fontWeight: '600', marginBottom: 4 },
+    myPositionRank:  { color: c.accent, fontSize: 32, fontWeight: '800' },
+    myPositionKm:    { color: c.textSub, fontSize: 16, fontWeight: '600', marginTop: 2, marginBottom: 8 },
+    myPositionHint:  { color: c.textFaint, fontSize: 12 },
+    myPositionTxt:   { color: c.textFaint, fontSize: 13, textAlign: 'center', lineHeight: 20 },
+  });
+}

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -13,6 +13,8 @@ import {
 import * as Location from 'expo-location';
 import { Coordinate } from '../types';
 import WebMapView, { WebMapViewHandle } from '../components/WebMapView';
+import { useTheme } from '../context/ThemeContext';
+import { Colors } from '../theme';
 
 const PRESET_KM = [3, 5, 10, 15, 21];
 const PRESET_LABELS: Record<number, string> = { 21: '하프 마라톤' };
@@ -25,12 +27,15 @@ interface Props {
 }
 
 export default function HomeScreen({ onSearch, onBack }: Props) {
-  const [location, setLocation] = useState<Coordinate | null>(null);
+  const [location, setLocation]   = useState<Coordinate | null>(null);
   const [selectedKm, setSelectedKm] = useState(5);
-  const [customKm, setCustomKm] = useState('');
+  const [customKm, setCustomKm]   = useState('');
   const [searching, setSearching] = useState(false);
   const [statusMsg, setStatusMsg] = useState('현재 위치를 가져오는 중...');
   const mapRef = useRef<WebMapViewHandle>(null);
+
+  const { colors } = useTheme();
+  const s = useMemo(() => makeStyles(colors), [colors]);
 
   useEffect(() => {
     (async () => {
@@ -119,7 +124,7 @@ export default function HomeScreen({ onSearch, onBack }: Props) {
           <TextInput
             style={s.customInput}
             placeholder="직접 입력"
-            placeholderTextColor="#666"
+            placeholderTextColor={colors.textFaint}
             keyboardType="decimal-pad"
             value={customKm}
             onChangeText={setCustomKm}
@@ -150,61 +155,63 @@ export default function HomeScreen({ onSearch, onBack }: Props) {
   );
 }
 
-const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0f0f0f' },
-  map: { flex: 1 },
-  backBtn: {
-    position: 'absolute',
-    top: Platform.OS === 'ios' ? 58 : 20,
-    left: 16,
-    paddingHorizontal: 14,
-    paddingVertical: 9,
-    borderRadius: 22,
-    backgroundColor: 'rgba(0,0,0,0.72)',
-  },
-  backBtnTxt: { color: '#fff', fontSize: 14, fontWeight: '600' },
-  panel: {
-    backgroundColor: '#1a1a1a',
-    borderTopLeftRadius: 22,
-    borderTopRightRadius: 22,
-    marginTop: -22,
-    padding: 20,
-    paddingBottom: Platform.OS === 'ios' ? 36 : 20,
-  },
-  titleRow: { marginBottom: 16 },
-  title: { color: '#fff', fontSize: 20, fontWeight: '700', marginBottom: 4 },
-  subtitle: { color: '#777', fontSize: 13 },
-  sectionLabel: { color: '#aaa', fontSize: 13, marginBottom: 8 },
-  presetScroll: { marginBottom: 10 },
-  presetBtn: {
-    paddingHorizontal: 18,
-    paddingVertical: 10,
-    borderRadius: 20,
-    backgroundColor: '#2a2a2a',
-    marginRight: 8,
-  },
-  presetBtnOn: { backgroundColor: '#00C853' },
-  presetBtnTxt: { color: '#888', fontWeight: '600', fontSize: 14 },
-  presetBtnTxtOn: { color: '#fff' },
-  customRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#2a2a2a',
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    marginBottom: 10,
-    height: 48,
-  },
-  customInput: { flex: 1, color: '#fff', fontSize: 16 },
-  kmSuffix: { color: '#777', fontSize: 14 },
-  locationStatus: { color: '#555', fontSize: 12, marginBottom: 14 },
-  searchBtn: {
-    backgroundColor: '#00C853',
-    borderRadius: 14,
-    paddingVertical: 16,
-    alignItems: 'center',
-  },
-  searchBtnOff: { opacity: 0.55 },
-  searchBtnTxt: { color: '#fff', fontSize: 16, fontWeight: '700' },
-  loadingRow: { flexDirection: 'row', alignItems: 'center' },
-});
+function makeStyles(c: Colors) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: c.bg },
+    map: { flex: 1 },
+    backBtn: {
+      position: 'absolute',
+      top: Platform.OS === 'ios' ? 58 : 20,
+      left: 16,
+      paddingHorizontal: 14,
+      paddingVertical: 9,
+      borderRadius: 22,
+      backgroundColor: c.overlayLight,
+    },
+    backBtnTxt: { color: '#fff', fontSize: 14, fontWeight: '600' },
+    panel: {
+      backgroundColor: c.card,
+      borderTopLeftRadius: 22,
+      borderTopRightRadius: 22,
+      marginTop: -22,
+      padding: 20,
+      paddingBottom: Platform.OS === 'ios' ? 36 : 20,
+    },
+    titleRow: { marginBottom: 16 },
+    title:    { color: c.text, fontSize: 20, fontWeight: '700', marginBottom: 4 },
+    subtitle: { color: c.textMuted, fontSize: 13 },
+    sectionLabel: { color: c.textSub, fontSize: 13, marginBottom: 8 },
+    presetScroll: { marginBottom: 10 },
+    presetBtn: {
+      paddingHorizontal: 18,
+      paddingVertical: 10,
+      borderRadius: 20,
+      backgroundColor: c.card2,
+      marginRight: 8,
+    },
+    presetBtnOn:    { backgroundColor: c.accent },
+    presetBtnTxt:   { color: c.textMuted, fontWeight: '600', fontSize: 14 },
+    presetBtnTxtOn: { color: '#fff' },
+    customRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: c.card2,
+      borderRadius: 12,
+      paddingHorizontal: 14,
+      marginBottom: 10,
+      height: 48,
+    },
+    customInput:    { flex: 1, color: c.text, fontSize: 16 },
+    kmSuffix:       { color: c.textMuted, fontSize: 14 },
+    locationStatus: { color: c.textFaint, fontSize: 12, marginBottom: 14 },
+    searchBtn: {
+      backgroundColor: c.accent,
+      borderRadius: 14,
+      paddingVertical: 16,
+      alignItems: 'center',
+    },
+    searchBtnOff: { opacity: 0.55 },
+    searchBtnTxt: { color: '#fff', fontSize: 16, fontWeight: '700' },
+    loadingRow:   { flexDirection: 'row', alignItems: 'center' },
+  });
+}

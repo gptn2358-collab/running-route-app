@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   Switch, Platform, Alert,
@@ -8,6 +8,8 @@ import { getUserRunHistory } from '../services/rankingService';
 import { getUserBattleHistory } from '../services/challengeService';
 import { saveProfile, signOut } from '../services/userService';
 import AccountScreen from './AccountScreen';
+import { useTheme } from '../context/ThemeContext';
+import { Colors } from '../theme';
 
 interface Props {
   profile: UserProfile | null;
@@ -20,6 +22,9 @@ export default function MyPageScreen({ profile, email, onProfileChange, onEditPr
   const [allRuns, setAllRuns]         = useState<RunRecord[]>([]);
   const [battleHistory, setBattleHistory] = useState<BattleRecord[]>([]);
   const [showAccount, setShowAccount] = useState(false);
+
+  const { colors, isDark, toggleTheme } = useTheme();
+  const s = useMemo(() => makeStyles(colors), [colors]);
 
   function handleSignOut() {
     Alert.alert('로그아웃', '정말 로그아웃 하시겠어요?', [
@@ -157,8 +162,25 @@ export default function MyPageScreen({ profile, email, onProfileChange, onEditPr
 
       {/* 설정 */}
       <View style={s.sectionCard}>
-        <Text style={s.cardTitle}>랭킹 설정</Text>
+        <Text style={s.cardTitle}>설정</Text>
 
+        {/* 테마 토글 */}
+        <View style={s.settingRow}>
+          <View style={s.settingLeft}>
+            <Text style={s.settingLabel}>{isDark ? '다크 모드' : '라이트 모드'}</Text>
+            <Text style={s.settingDesc}>앱 색상 테마를 변경합니다</Text>
+          </View>
+          <Switch
+            value={isDark}
+            onValueChange={toggleTheme}
+            trackColor={{ false: '#ccc', true: colors.accent }}
+            thumbColor="#fff"
+          />
+        </View>
+
+        <View style={s.divider} />
+
+        {/* 랭킹 참여 */}
         <View style={s.settingRow}>
           <View style={s.settingLeft}>
             <Text style={s.settingLabel}>랭킹 참여</Text>
@@ -169,7 +191,7 @@ export default function MyPageScreen({ profile, email, onProfileChange, onEditPr
           <Switch
             value={profile?.optedInRanking ?? false}
             onValueChange={toggleRanking}
-            trackColor={{ false: '#333', true: '#00C853' }}
+            trackColor={{ false: '#333', true: colors.accent }}
             thumbColor="#fff"
           />
         </View>
@@ -220,108 +242,111 @@ export default function MyPageScreen({ profile, email, onProfileChange, onEditPr
   );
 }
 
-const s = StyleSheet.create({
-  bg: { flex: 1, backgroundColor: '#0f0f0f' },
-  content: {
-    padding: 20,
-    paddingTop: Platform.OS === 'ios' ? 60 : 40,
-    paddingBottom: 32,
-    gap: 16,
-  },
+function makeStyles(c: Colors) {
+  return StyleSheet.create({
+    bg: { flex: 1, backgroundColor: c.bg },
+    content: {
+      padding: 20,
+      paddingTop: Platform.OS === 'ios' ? 60 : 40,
+      paddingBottom: 32,
+      gap: 16,
+    },
 
-  header: { marginBottom: 4 },
-  headerTitle: { color: '#fff', fontSize: 22, fontWeight: '800' },
+    header:      { marginBottom: 4 },
+    headerTitle: { color: c.text, fontSize: 22, fontWeight: '800' },
 
-  profileCard: {
-    backgroundColor: '#1a1a1a',
-    borderRadius: 20,
-    padding: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-  },
-  avatar: {
-    width: 54,
-    height: 54,
-    borderRadius: 27,
-    backgroundColor: '#00C853',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarTxt: { color: '#fff', fontSize: 24, fontWeight: '800' },
-  profileInfo: { flex: 1 },
-  nickname: { color: '#fff', fontSize: 18, fontWeight: '700' },
-  profileSub: { color: '#666', fontSize: 13, marginTop: 2 },
-  editBtn: {
-    backgroundColor: '#2a2a2a',
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-  },
-  editBtnTxt: { color: '#aaa', fontSize: 13, fontWeight: '600' },
+    profileCard: {
+      backgroundColor: c.card,
+      borderRadius: 20,
+      padding: 20,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 14,
+    },
+    avatar: {
+      width: 54,
+      height: 54,
+      borderRadius: 27,
+      backgroundColor: c.accent,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    avatarTxt:   { color: '#fff', fontSize: 24, fontWeight: '800' },
+    profileInfo: { flex: 1 },
+    nickname:    { color: c.text, fontSize: 18, fontWeight: '700' },
+    profileSub:  { color: c.textMuted, fontSize: 13, marginTop: 2 },
+    editBtn: {
+      backgroundColor: c.card2,
+      borderRadius: 10,
+      paddingHorizontal: 12,
+      paddingVertical: 7,
+    },
+    editBtnTxt: { color: c.textSub, fontSize: 13, fontWeight: '600' },
 
-  statsCard: { backgroundColor: '#1a1a1a', borderRadius: 20, padding: 20 },
-  cardTitle: { color: '#666', fontSize: 12, fontWeight: '600', marginBottom: 16 },
-  statsRow: { flexDirection: 'row', alignItems: 'center' },
-  statItem: { flex: 1, alignItems: 'center' },
-  statBig: { color: '#00C853', fontSize: 24, fontWeight: '800' },
-  statUnit: { color: '#555', fontSize: 12 },
-  statLbl: { color: '#666', fontSize: 11, marginTop: 2 },
-  statDiv: { width: 1, height: 40, backgroundColor: '#2a2a2a' },
+    statsCard: { backgroundColor: c.card, borderRadius: 20, padding: 20 },
+    cardTitle: { color: c.textMuted, fontSize: 12, fontWeight: '600', marginBottom: 16 },
+    statsRow:  { flexDirection: 'row', alignItems: 'center' },
+    statItem:  { flex: 1, alignItems: 'center' },
+    statBig:   { color: c.accent, fontSize: 24, fontWeight: '800' },
+    statUnit:  { color: c.textFaint, fontSize: 12 },
+    statLbl:   { color: c.textMuted, fontSize: 11, marginTop: 2 },
+    statDiv:   { width: 1, height: 40, backgroundColor: c.border },
 
-  goldTxt: { color: '#FFD60A' },
-  battleEmpty: { color: '#444', fontSize: 13, textAlign: 'center', paddingVertical: 12 },
-  battleList: { marginTop: 16, gap: 2 },
-  battleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#242424',
-    gap: 10,
-  },
-  battleRankEmoji: { fontSize: 20, width: 28, textAlign: 'center' },
-  battleInfo: { flex: 1 },
-  battleTitle: { color: '#ddd', fontSize: 14, fontWeight: '600' },
-  battleSub: { color: '#555', fontSize: 11, marginTop: 2 },
-  battleRankNum: { color: '#666', fontSize: 13, fontWeight: '700' },
+    goldTxt:     { color: '#FFD60A' },
+    battleEmpty: { color: c.textFaint, fontSize: 13, textAlign: 'center', paddingVertical: 12 },
+    battleList:  { marginTop: 16, gap: 2 },
+    battleRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 10,
+      borderBottomWidth: 1,
+      borderBottomColor: c.border,
+      gap: 10,
+    },
+    battleRankEmoji: { fontSize: 20, width: 28, textAlign: 'center' },
+    battleInfo:      { flex: 1 },
+    battleTitle:     { color: c.text, fontSize: 14, fontWeight: '600' },
+    battleSub:       { color: c.textMuted, fontSize: 11, marginTop: 2 },
+    battleRankNum:   { color: c.textMuted, fontSize: 13, fontWeight: '700' },
 
-  sectionCard: { backgroundColor: '#1a1a1a', borderRadius: 20, padding: 20 },
-  settingRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  settingLeft: { flex: 1 },
-  settingLabel: { color: '#ddd', fontSize: 15, fontWeight: '600', marginBottom: 3 },
-  settingDesc: { color: '#666', fontSize: 12, lineHeight: 18 },
-  rankingOnBadge: {
-    marginTop: 14,
-    backgroundColor: '#0d2018',
-    borderRadius: 10,
-    padding: 12,
-  },
-  rankingOnTxt: { color: '#00C853', fontSize: 12, fontWeight: '600' },
+    sectionCard:  { backgroundColor: c.card, borderRadius: 20, padding: 20 },
+    divider:      { height: 1, backgroundColor: c.divider, marginVertical: 14 },
+    settingRow:   { flexDirection: 'row', alignItems: 'center', gap: 12 },
+    settingLeft:  { flex: 1 },
+    settingLabel: { color: c.text, fontSize: 15, fontWeight: '600', marginBottom: 3 },
+    settingDesc:  { color: c.textMuted, fontSize: 12, lineHeight: 18 },
+    rankingOnBadge: {
+      marginTop: 14,
+      backgroundColor: c.accentBg,
+      borderRadius: 10,
+      padding: 12,
+    },
+    rankingOnTxt: { color: c.accent, fontSize: 12, fontWeight: '600' },
 
-  offCard: { backgroundColor: '#1a1209', borderWidth: 1, borderColor: '#3a2a0a' },
-  offTitle: { color: '#FFD60A' },
-  offDesc: { color: '#9a8060', fontSize: 13, lineHeight: 20 },
+    offCard:  { backgroundColor: c.offBg, borderWidth: 1, borderColor: c.offBorder },
+    offTitle: { color: '#FFD60A' },
+    offDesc:  { color: c.textMuted, fontSize: 13, lineHeight: 20 },
 
-  accountBanner: {
-    backgroundColor: '#1a1a1a',
-    borderRadius: 20,
-    padding: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  accountBannerLeft: { flex: 1 },
-  accountBannerTitle: { color: '#ddd', fontSize: 15, fontWeight: '700' },
-  accountBannerSub: { color: '#555', fontSize: 12, marginTop: 3 },
-  accountBannerArrow: { color: '#444', fontSize: 22 },
+    accountBanner: {
+      backgroundColor: c.card,
+      borderRadius: 20,
+      padding: 20,
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    accountBannerLeft:  { flex: 1 },
+    accountBannerTitle: { color: c.text, fontSize: 15, fontWeight: '700' },
+    accountBannerSub:   { color: c.textFaint, fontSize: 12, marginTop: 3 },
+    accountBannerArrow: { color: c.textFaint, fontSize: 22 },
 
-  logoutBtn: {
-    backgroundColor: '#1a1a1a',
-    borderRadius: 14,
-    paddingVertical: 16,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#3a1a1a',
-  },
-  logoutTxt: { color: '#FF453A', fontSize: 15, fontWeight: '700' },
-});
+    logoutBtn: {
+      backgroundColor: c.card,
+      borderRadius: 14,
+      paddingVertical: 16,
+      alignItems: 'center',
+      borderWidth: 1,
+      borderColor: '#3a1a1a',
+    },
+    logoutTxt: { color: '#FF453A', fontSize: 15, fontWeight: '700' },
+  });
+}

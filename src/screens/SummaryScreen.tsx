@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,8 @@ import {
   ScrollView,
 } from 'react-native';
 import { RunStats, UserProfile } from '../types';
+import { useTheme } from '../context/ThemeContext';
+import { Colors } from '../theme';
 
 interface Props {
   stats: RunStats;
@@ -19,9 +21,12 @@ interface Props {
 export default function SummaryScreen({ stats, profile, onHome, onRanking }: Props) {
   const { distance, duration } = stats;
 
+  const { colors } = useTheme();
+  const s = useMemo(() => makeStyles(colors), [colors]);
+
   const km = distance / 1000;
   const pace = duration > 0 && distance > 50 ? (duration / distance) * 1000 : 0;
-  const calories = Math.round(km * 62); // ~62 kcal/km for average runner
+  const calories = Math.round(km * 62);
 
   function fmtDuration(sec: number) {
     const h = Math.floor(sec / 3600);
@@ -102,77 +107,69 @@ export default function SummaryScreen({ stats, profile, onHome, onRanking }: Pro
   );
 }
 
-const s = StyleSheet.create({
-  bg: { flex: 1, backgroundColor: '#0f0f0f' },
-  container: {
-    flexGrow: 1,
-    justifyContent: 'center',
-    padding: 24,
-    paddingBottom: Platform.OS === 'ios' ? 50 : 30,
-  },
-  emoji: { fontSize: 52, textAlign: 'center', marginBottom: 8 },
-  title: {
-    color: '#fff',
-    fontSize: 28,
-    fontWeight: '800',
-    textAlign: 'center',
-    marginBottom: 6,
-  },
-  perf: {
-    color: '#888',
-    fontSize: 15,
-    textAlign: 'center',
-    marginBottom: 32,
-  },
-  card: {
-    backgroundColor: '#1a1a1a',
-    borderRadius: 20,
-    padding: 24,
-    marginBottom: 28,
-  },
-  row: { flexDirection: 'row', justifyContent: 'space-around' },
-  stat: { flex: 1, alignItems: 'center', paddingVertical: 10 },
-  big: { color: '#00C853', fontSize: 26, fontWeight: '800' },
-  unit: { color: '#777', fontSize: 13 },
-  lbl: { color: '#666', fontSize: 12, marginTop: 4 },
-  vDiv: { width: 1, backgroundColor: '#2a2a2a' },
-  hDiv: { height: 1, backgroundColor: '#2a2a2a', marginVertical: 6 },
-  rankingBadge: {
-    backgroundColor: '#0d2818',
-    borderRadius: 10,
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    alignItems: 'center',
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#1a4a2a',
-  },
-  rankingBadgeTxt: { color: '#00C853', fontSize: 12, fontWeight: '600' },
-  reviewBtn: {
-    backgroundColor: '#1e1e1e',
-    borderRadius: 14,
-    paddingVertical: 16,
-    alignItems: 'center',
-    marginBottom: 10,
-    borderWidth: 1.5,
-    borderColor: '#2979FF',
-  },
-  reviewBtnTxt: { color: '#2979FF', fontSize: 15, fontWeight: '700' },
-  rankingBtn: {
-    backgroundColor: '#1e1e1e',
-    borderRadius: 14,
-    paddingVertical: 16,
-    alignItems: 'center',
-    marginBottom: 10,
-    borderWidth: 1.5,
-    borderColor: '#FFD60A',
-  },
-  rankingBtnTxt: { color: '#FFD60A', fontSize: 15, fontWeight: '700' },
-  homeBtn: {
-    backgroundColor: '#00C853',
-    borderRadius: 14,
-    paddingVertical: 17,
-    alignItems: 'center',
-  },
-  homeBtnTxt: { color: '#fff', fontSize: 16, fontWeight: '700' },
-});
+function makeStyles(c: Colors) {
+  return StyleSheet.create({
+    bg: { flex: 1, backgroundColor: c.bg },
+    container: {
+      flexGrow: 1,
+      justifyContent: 'center',
+      padding: 24,
+      paddingBottom: Platform.OS === 'ios' ? 50 : 30,
+    },
+    emoji: { fontSize: 52, textAlign: 'center', marginBottom: 8 },
+    title: {
+      color: c.text,
+      fontSize: 28,
+      fontWeight: '800',
+      textAlign: 'center',
+      marginBottom: 6,
+    },
+    perf: {
+      color: c.textMuted,
+      fontSize: 15,
+      textAlign: 'center',
+      marginBottom: 32,
+    },
+    card: {
+      backgroundColor: c.card,
+      borderRadius: 20,
+      padding: 24,
+      marginBottom: 28,
+    },
+    row:  { flexDirection: 'row', justifyContent: 'space-around' },
+    stat: { flex: 1, alignItems: 'center', paddingVertical: 10 },
+    big:  { color: c.accent, fontSize: 26, fontWeight: '800' },
+    unit: { color: c.textMuted, fontSize: 13 },
+    lbl:  { color: c.textMuted, fontSize: 12, marginTop: 4 },
+    vDiv: { width: 1, backgroundColor: c.border },
+    hDiv: { height: 1, backgroundColor: c.border, marginVertical: 6 },
+    rankingBadge: {
+      backgroundColor: c.accentBg,
+      borderRadius: 10,
+      paddingVertical: 8,
+      paddingHorizontal: 14,
+      alignItems: 'center',
+      marginBottom: 16,
+      borderWidth: 1,
+      borderColor: c.accentBorder,
+    },
+    rankingBadgeTxt: { color: c.accent, fontSize: 12, fontWeight: '600' },
+    rankingBtn: {
+      backgroundColor: c.card,
+      borderRadius: 14,
+      paddingVertical: 16,
+      alignItems: 'center',
+      marginBottom: 10,
+      borderWidth: 1.5,
+      borderColor: '#FFD60A',
+    },
+    rankingBtnTxt: { color: '#FFD60A', fontSize: 15, fontWeight: '700' },
+    homeBtn: {
+      backgroundColor: c.accent,
+      borderRadius: 14,
+      paddingVertical: 17,
+      alignItems: 'center',
+    },
+    homeBtnTxt: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  });
+}
