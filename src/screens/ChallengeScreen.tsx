@@ -10,6 +10,8 @@ import {
   cancelChallenge, leaveChallenge, getUserBattleHistory,
 } from '../services/challengeService';
 import { getUserRunHistory } from '../services/rankingService';
+import { useTheme } from '../context/ThemeContext';
+import { Colors } from '../theme';
 
 type ViewKey = 'list' | 'history';
 
@@ -37,7 +39,7 @@ function formatScheduledAt(iso: string): string {
 
 function isStartable(iso: string): boolean {
   const diff = new Date(iso).getTime() - Date.now();
-  return diff <= 5 * 60 * 1000; // 5분 이내면 입장 가능
+  return diff <= 5 * 60 * 1000;
 }
 
 function timeUntil(iso: string): string {
@@ -50,23 +52,25 @@ function timeUntil(iso: string): string {
 }
 
 export default function ChallengeScreen({ profile, onEnterBattle, onSetupProfile }: Props) {
-  const [challenges, setChallenges] = useState<Challenge[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [showCreate, setShowCreate] = useState(false);
-  const [view, setView] = useState<ViewKey>('list');
-  const [sortKey, setSortKey] = useState<SortKey>('soonest');
-  const [runHistory, setRunHistory] = useState<RunRecord[]>([]);
+  const [challenges, setChallenges]       = useState<Challenge[]>([]);
+  const [loading, setLoading]             = useState(true);
+  const [refreshing, setRefreshing]       = useState(false);
+  const [showCreate, setShowCreate]       = useState(false);
+  const [view, setView]                   = useState<ViewKey>('list');
+  const [sortKey, setSortKey]             = useState<SortKey>('soonest');
+  const [runHistory, setRunHistory]       = useState<RunRecord[]>([]);
   const [battleHistory, setBattleHistory] = useState<BattleRecord[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
 
-  // 생성 폼 상태
-  const [roomTitle, setRoomTitle] = useState('');
+  const [roomTitle, setRoomTitle]   = useState('');
   const [distanceKm, setDistanceKm] = useState(5);
-  const [maxPart, setMaxPart] = useState(4);
-  const [dateStr, setDateStr] = useState(''); // YYYY-MM-DD
-  const [timeStr, setTimeStr] = useState(''); // HH:MM
-  const [creating, setCreating] = useState(false);
+  const [maxPart, setMaxPart]       = useState(4);
+  const [dateStr, setDateStr]       = useState('');
+  const [timeStr, setTimeStr]       = useState('');
+  const [creating, setCreating]     = useState(false);
+
+  const { colors } = useTheme();
+  const s = useMemo(() => makeStyles(colors), [colors]);
 
   const load = useCallback(async () => {
     const list = await getOpenChallenges();
@@ -138,7 +142,6 @@ export default function ChallengeScreen({ profile, onEnterBattle, onSetupProfile
   async function handleJoin(challenge: Challenge) {
     if (!requireProfile()) return;
     if (challenge.participants.includes(profile!.id)) {
-      // 이미 참여 중 → 입장 가능하면 바로 들어가기
       if (isStartable(challenge.scheduledAt)) {
         onEnterBattle(challenge.id);
       } else {
@@ -199,11 +202,9 @@ export default function ChallengeScreen({ profile, onEnterBattle, onSetupProfile
     );
   }
 
-  // ── 관련도 계산용 내 러닝 프로필 ────────────────────────────────
   const myRunProfile = useMemo(() => {
     if (runHistory.length === 0) return null;
     const avgDistM = runHistory.reduce((s, r) => s + r.distanceM, 0) / runHistory.length;
-    // submittedAt 시간대로 선호 시간대 계산 (0~23시의 원형 평균)
     const hours = runHistory.map(r => new Date(r.submittedAt).getHours());
     const sinSum = hours.reduce((s, h) => s + Math.sin((h / 24) * 2 * Math.PI), 0);
     const cosSum = hours.reduce((s, h) => s + Math.cos((h / 24) * 2 * Math.PI), 0);
@@ -220,33 +221,28 @@ export default function ChallengeScreen({ profile, onEnterBattle, onSetupProfile
     if (sortKey === 'soonest') {
       return list.sort((a, b) => a.scheduledAt.localeCompare(b.scheduledAt));
     }
-    // 관련도순 — 내 평균 거리·선호 시간대와 가까울수록 상위
     if (sortKey === 'relevant') {
       if (!myRunProfile) {
-        // 기록 없으면 soonest로 fallback
         return list.sort((a, b) => a.scheduledAt.localeCompare(b.scheduledAt));
       }
       const score = (c: Challenge) => {
         const { avgDistM, preferredHour } = myRunProfile;
-        // 거리 유사도 (0=완벽, 클수록 차이 큼)
         const distDiff = Math.abs(c.distanceKm * 1000 - avgDistM) / Math.max(avgDistM, 1);
-        // 시간대 유사도 — 원형 거리 (0~12시간 단위로 정규화)
         const cHour = new Date(c.scheduledAt).getHours();
         const hourDiff = Math.min(
           Math.abs(cHour - preferredHour),
           24 - Math.abs(cHour - preferredHour),
-        ) / 12; // 0~1 정규화
-        return distDiff * 0.5 + hourDiff * 0.5; // 낮을수록 관련도 높음
+        ) / 12;
+        return distDiff * 0.5 + hourDiff * 0.5;
       };
       return list.sort((a, b) => score(a) - score(b));
     }
     return list;
   }, [challenges, sortKey, myRunProfile]);
 
-  // 기본 날짜/시간 값 설정 (생성 모달 열릴 때)
   function openCreate() {
     if (!requireProfile()) return;
-    const d = new Date(Date.now() + 60 * 60 * 1000); // 1시간 후
+    const d = new Date(Date.now() + 60 * 60 * 1000);
     const pad = (n: number) => n.toString().padStart(2, '0');
     setRoomTitle('');
     setDateStr(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`);
@@ -257,7 +253,7 @@ export default function ChallengeScreen({ profile, onEnterBattle, onSetupProfile
   if (loading) {
     return (
       <View style={s.center}>
-        <ActivityIndicator color="#00C853" size="large" />
+        <ActivityIndicator color={colors.accent} size="large" />
       </View>
     );
   }
@@ -274,7 +270,7 @@ export default function ChallengeScreen({ profile, onEnterBattle, onSetupProfile
         )}
       </View>
 
-      {/* 목록 / 전적 탭 전환 */}
+      {/* 목록 / 전적 탭 */}
       <View style={s.viewTabs}>
         <TouchableOpacity
           style={[s.viewTab, view === 'list' && s.viewTabOn]}
@@ -290,7 +286,7 @@ export default function ChallengeScreen({ profile, onEnterBattle, onSetupProfile
         </TouchableOpacity>
       </View>
 
-      {/* 정렬 칩 — 목록 뷰에서만 */}
+      {/* 정렬 칩 */}
       {view === 'list' && (
         <View style={s.sortRow}>
           {([
@@ -318,7 +314,7 @@ export default function ChallengeScreen({ profile, onEnterBattle, onSetupProfile
       {view === 'history' && (
         <ScrollView contentContainerStyle={s.historyContent}>
           {historyLoading ? (
-            <ActivityIndicator color="#00C853" style={{ marginTop: 60 }} />
+            <ActivityIndicator color={colors.accent} style={{ marginTop: 60 }} />
           ) : battleHistory.length === 0 ? (
             <View style={s.emptyBox}>
               <Text style={s.emptyIcon}>🏅</Text>
@@ -327,7 +323,6 @@ export default function ChallengeScreen({ profile, onEnterBattle, onSetupProfile
             </View>
           ) : (
             <>
-              {/* 요약 카드 */}
               <View style={s.histSummary}>
                 <View style={s.histStat}>
                   <Text style={s.histStatBig}>{battleHistory.length}</Text>
@@ -356,7 +351,6 @@ export default function ChallengeScreen({ profile, onEnterBattle, onSetupProfile
                 </View>
               </View>
 
-              {/* 전체 전적 목록 */}
               <Text style={s.histListTitle}>전체 전적</Text>
               {battleHistory.map((b, i) => {
                 const d = new Date(b.finishedAt);
@@ -389,104 +383,101 @@ export default function ChallengeScreen({ profile, onEnterBattle, onSetupProfile
       )}
 
       {/* ── 목록 뷰 ── */}
-      {view === 'list' && <ScrollView
-        contentContainerStyle={s.list}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#00C853" />}
-      >
-        {challenges.length === 0 ? (
-          <View style={s.emptyBox}>
-            <Text style={s.emptyIcon}>⚔️</Text>
-            <Text style={s.emptyTitle}>진행 중인 대결이 없어요</Text>
-            <Text style={s.emptyDesc}>첫 번째 대결을 만들어보세요!</Text>
-            <TouchableOpacity style={s.emptyBtn} onPress={openCreate}>
-              <Text style={s.emptyBtnTxt}>대결 만들기</Text>
-            </TouchableOpacity>
-          </View>
-        ) : (
-          sortedChallenges.map(c => {
-            const isMyChallenge = profile ? c.creatorId === profile.id : false;
-            const joined = profile ? c.participants.includes(profile.id) : false;
-            const full = c.participants.length >= c.maxParticipants;
-            const startable = isStartable(c.scheduledAt);
-            return (
-              <View key={c.id} style={[s.card, isMyChallenge && s.myCard]}>
-                <View style={s.cardTop}>
-                  <View style={s.distBadge}>
-                    <Text style={s.distTxt}>{c.distanceKm} km</Text>
+      {view === 'list' && (
+        <ScrollView
+          contentContainerStyle={s.list}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.accent} />}
+        >
+          {challenges.length === 0 ? (
+            <View style={s.emptyBox}>
+              <Text style={s.emptyIcon}>⚔️</Text>
+              <Text style={s.emptyTitle}>진행 중인 대결이 없어요</Text>
+              <Text style={s.emptyDesc}>첫 번째 대결을 만들어보세요!</Text>
+              <TouchableOpacity style={s.emptyBtn} onPress={openCreate}>
+                <Text style={s.emptyBtnTxt}>대결 만들기</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            sortedChallenges.map(c => {
+              const isMyChallenge = profile ? c.creatorId === profile.id : false;
+              const joined = profile ? c.participants.includes(profile.id) : false;
+              const full = c.participants.length >= c.maxParticipants;
+              const startable = isStartable(c.scheduledAt);
+              return (
+                <View key={c.id} style={[s.card, isMyChallenge && s.myCard]}>
+                  <View style={s.cardTop}>
+                    <View style={s.distBadge}>
+                      <Text style={s.distTxt}>{c.distanceKm} km</Text>
+                    </View>
+                    {isMyChallenge && (
+                      <View style={s.myBadge}>
+                        <Text style={s.myBadgeTxt}>내 대결</Text>
+                      </View>
+                    )}
+                    {startable && (
+                      <View style={s.nowBadge}>
+                        <Text style={s.nowTxt}>지금 시작!</Text>
+                      </View>
+                    )}
+                    <Text style={s.timeUntil}>{timeUntil(c.scheduledAt)}</Text>
                   </View>
-                  {isMyChallenge && (
-                    <View style={s.myBadge}>
-                      <Text style={s.myBadgeTxt}>내 대결</Text>
-                    </View>
-                  )}
-                  {startable && (
-                    <View style={s.nowBadge}>
-                      <Text style={s.nowTxt}>지금 시작!</Text>
-                    </View>
-                  )}
-                  <Text style={s.timeUntil}>{timeUntil(c.scheduledAt)}</Text>
-                </View>
 
-                <Text style={s.cardTitle}>{c.title}</Text>
-                <Text style={s.cardTime}>{formatScheduledAt(c.scheduledAt)}</Text>
-                <Text style={s.cardCreator}>
-                  {isMyChallenge ? '내가 만든 대결' : `주최: ${c.creatorNickname}`}
-                </Text>
-
-                <View style={s.cardBottom}>
-                  <Text style={s.partCount}>
-                    👥 {c.participants.length}/{c.maxParticipants}명
+                  <Text style={s.cardTitle}>{c.title}</Text>
+                  <Text style={s.cardTime}>{formatScheduledAt(c.scheduledAt)}</Text>
+                  <Text style={s.cardCreator}>
+                    {isMyChallenge ? '내가 만든 대결' : `주최: ${c.creatorNickname}`}
                   </Text>
 
-                  <View style={s.cardBtns}>
-                    {/* 주최자: 취소 버튼 */}
-                    {isMyChallenge && (
-                      <TouchableOpacity style={s.cancelChalBtn} onPress={() => handleCancel(c)}>
-                        <Text style={s.cancelChalBtnTxt}>대결 취소</Text>
-                      </TouchableOpacity>
-                    )}
+                  <View style={s.cardBottom}>
+                    <Text style={s.partCount}>
+                      👥 {c.participants.length}/{c.maxParticipants}명
+                    </Text>
 
-                    {/* 참여자(비주최자): 참여 취소 버튼 */}
-                    {!isMyChallenge && joined && !startable && (
-                      <TouchableOpacity style={s.leaveChalBtn} onPress={() => handleLeave(c)}>
-                        <Text style={s.leaveChalBtnTxt}>참여 취소</Text>
+                    <View style={s.cardBtns}>
+                      {isMyChallenge && (
+                        <TouchableOpacity style={s.cancelChalBtn} onPress={() => handleCancel(c)}>
+                          <Text style={s.cancelChalBtnTxt}>대결 취소</Text>
+                        </TouchableOpacity>
+                      )}
+                      {!isMyChallenge && joined && !startable && (
+                        <TouchableOpacity style={s.leaveChalBtn} onPress={() => handleLeave(c)}>
+                          <Text style={s.leaveChalBtnTxt}>참여 취소</Text>
+                        </TouchableOpacity>
+                      )}
+                      <TouchableOpacity
+                        style={[
+                          s.joinBtn,
+                          startable && s.joinBtnEnter,
+                          !startable && joined && !isMyChallenge && s.joinBtnJoined,
+                          !joined && full && s.joinBtnFull,
+                        ]}
+                        onPress={() => handleJoin(c)}
+                        disabled={!joined && full}
+                      >
+                        <Text style={[
+                          s.joinBtnTxt,
+                          !startable && joined && !isMyChallenge && s.joinBtnTxtJoined,
+                        ]}>
+                          {startable
+                            ? '입장하기'
+                            : isMyChallenge
+                              ? '내 대결'
+                              : joined
+                                ? '참여 중'
+                                : full
+                                  ? '마감'
+                                  : '참여하기'
+                          }
+                        </Text>
                       </TouchableOpacity>
-                    )}
-
-                    {/* 입장/참여 버튼 */}
-                    <TouchableOpacity
-                      style={[
-                        s.joinBtn,
-                        startable && s.joinBtnEnter,
-                        !startable && joined && !isMyChallenge && s.joinBtnJoined,
-                        !joined && full && s.joinBtnFull,
-                      ]}
-                      onPress={() => handleJoin(c)}
-                      disabled={!joined && full}
-                    >
-                      <Text style={[
-                        s.joinBtnTxt,
-                        !startable && joined && !isMyChallenge && s.joinBtnTxtJoined,
-                      ]}>
-                        {startable
-                          ? '입장하기'
-                          : isMyChallenge
-                            ? '내 대결'
-                            : joined
-                              ? '참여 중'
-                              : full
-                                ? '마감'
-                                : '참여하기'
-                        }
-                      </Text>
-                    </TouchableOpacity>
+                    </View>
                   </View>
                 </View>
-              </View>
-            );
-          })
-        )}
-      </ScrollView>}
+              );
+            })
+          )}
+        </ScrollView>
+      )}
 
       {/* 대결 만들기 모달 */}
       <Modal visible={showCreate} animationType="slide" transparent>
@@ -500,7 +491,7 @@ export default function ChallengeScreen({ profile, onEnterBattle, onSetupProfile
               value={roomTitle}
               onChangeText={setRoomTitle}
               placeholder="예: 새벽 한강 5km 같이 뛰실 분!"
-              placeholderTextColor="#444"
+              placeholderTextColor={colors.textFaint}
               maxLength={30}
               returnKeyType="done"
               autoFocus
@@ -539,7 +530,7 @@ export default function ChallengeScreen({ profile, onEnterBattle, onSetupProfile
               value={dateStr}
               onChangeText={setDateStr}
               placeholder="2025-06-15"
-              placeholderTextColor="#555"
+              placeholderTextColor={colors.textFaint}
               keyboardType="numbers-and-punctuation"
               maxLength={10}
             />
@@ -550,7 +541,7 @@ export default function ChallengeScreen({ profile, onEnterBattle, onSetupProfile
               value={timeStr}
               onChangeText={setTimeStr}
               placeholder="07:00"
-              placeholderTextColor="#555"
+              placeholderTextColor={colors.textFaint}
               keyboardType="numbers-and-punctuation"
               maxLength={5}
             />
@@ -577,239 +568,211 @@ export default function ChallengeScreen({ profile, onEnterBattle, onSetupProfile
   );
 }
 
-const s = StyleSheet.create({
-  bg: { flex: 1, backgroundColor: '#0f0f0f' },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#0f0f0f' },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingTop: Platform.OS === 'ios' ? 60 : 40,
-    paddingBottom: 12,
-  },
-  headerTitle: { color: '#fff', fontSize: 22, fontWeight: '800' },
+function makeStyles(c: Colors) {
+  return StyleSheet.create({
+    bg:     { flex: 1, backgroundColor: c.bg },
+    center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: c.bg },
 
-  viewTabs: {
-    flexDirection: 'row',
-    marginHorizontal: 20,
-    marginBottom: 12,
-    backgroundColor: '#1a1a1a',
-    borderRadius: 12,
-    padding: 3,
-  },
-  viewTab: {
-    flex: 1,
-    paddingVertical: 9,
-    alignItems: 'center',
-    borderRadius: 10,
-  },
-  viewTabOn: { backgroundColor: '#2a2a2a' },
-  viewTabTxt: { color: '#555', fontSize: 14, fontWeight: '600' },
-  viewTabTxtOn: { color: '#fff' },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 20,
+      paddingTop: Platform.OS === 'ios' ? 60 : 40,
+      paddingBottom: 12,
+    },
+    headerTitle: { color: c.text, fontSize: 22, fontWeight: '800' },
 
-  historyContent: { padding: 16, gap: 12, paddingBottom: 32 },
-  histSummary: {
-    backgroundColor: '#1a1a1a',
-    borderRadius: 18,
-    padding: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  histStat: { flex: 1, alignItems: 'center', gap: 4 },
-  histStatBig: { color: '#00C853', fontSize: 22, fontWeight: '800' },
-  histStatLbl: { color: '#555', fontSize: 10, fontWeight: '600' },
-  histStatDiv: { width: 1, height: 32, backgroundColor: '#2a2a2a' },
-  goldTxt: { color: '#FFD60A' },
+    viewTabs: {
+      flexDirection: 'row',
+      marginHorizontal: 20,
+      marginBottom: 12,
+      backgroundColor: c.card,
+      borderRadius: 12,
+      padding: 3,
+    },
+    viewTab:      { flex: 1, paddingVertical: 9, alignItems: 'center', borderRadius: 10 },
+    viewTabOn:    { backgroundColor: c.card2 },
+    viewTabTxt:   { color: c.textFaint, fontSize: 14, fontWeight: '600' },
+    viewTabTxtOn: { color: c.text },
 
-  histListTitle: {
-    color: '#555',
-    fontSize: 11,
-    fontWeight: '600',
-    marginTop: 4,
-    marginBottom: 4,
-    paddingHorizontal: 4,
-  },
-  histRow: {
-    backgroundColor: '#1a1a1a',
-    borderRadius: 14,
-    padding: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  histRankBox: { width: 36, alignItems: 'center' },
-  histRankEmoji: { fontSize: 24 },
-  histRankNum: { color: '#888', fontSize: 15, fontWeight: '800' },
-  histInfo: { flex: 1, gap: 3 },
-  histTitle: { color: '#fff', fontSize: 14, fontWeight: '700' },
-  histSub: { color: '#666', fontSize: 12 },
-  histDate: { color: '#444', fontSize: 11 },
-  histFinalRank: { color: '#555', fontSize: 14, fontWeight: '700' },
+    historyContent: { padding: 16, gap: 12, paddingBottom: 32 },
+    histSummary: {
+      backgroundColor: c.card,
+      borderRadius: 18,
+      padding: 20,
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    histStat:    { flex: 1, alignItems: 'center', gap: 4 },
+    histStatBig: { color: c.accent, fontSize: 22, fontWeight: '800' },
+    histStatLbl: { color: c.textFaint, fontSize: 10, fontWeight: '600' },
+    histStatDiv: { width: 1, height: 32, backgroundColor: c.border },
+    goldTxt:     { color: '#FFD60A' },
 
-  createBtn: {
-    backgroundColor: '#00C853',
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-  },
-  createBtnTxt: { color: '#fff', fontSize: 13, fontWeight: '700' },
+    histListTitle: {
+      color: c.textFaint,
+      fontSize: 11,
+      fontWeight: '600',
+      marginTop: 4,
+      marginBottom: 4,
+      paddingHorizontal: 4,
+    },
+    histRow: {
+      backgroundColor: c.card,
+      borderRadius: 14,
+      padding: 14,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+    },
+    histRankBox:   { width: 36, alignItems: 'center' },
+    histRankEmoji: { fontSize: 24 },
+    histRankNum:   { color: c.textMuted, fontSize: 15, fontWeight: '800' },
+    histInfo:      { flex: 1, gap: 3 },
+    histTitle:     { color: c.text, fontSize: 14, fontWeight: '700' },
+    histSub:       { color: c.textMuted, fontSize: 12 },
+    histDate:      { color: c.textFaint, fontSize: 11 },
+    histFinalRank: { color: c.textFaint, fontSize: 14, fontWeight: '700' },
 
-  sortRow: {
-    flexDirection: 'row',
-    paddingHorizontal: 16,
-    gap: 8,
-    paddingBottom: 12,
-  },
-  sortChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#1a1a1a',
-    borderRadius: 20,
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    borderWidth: 1,
-    borderColor: '#2a2a2a',
-  },
-  sortChipOn: { borderColor: '#00C853', backgroundColor: '#002a14' },
-  sortChipTxt: { color: '#666', fontSize: 13, fontWeight: '600' },
-  sortChipTxtOn: { color: '#00C853' },
-  sortChipSub: { color: '#444', fontSize: 10 },
+    createBtn: {
+      backgroundColor: c.accent,
+      borderRadius: 10,
+      paddingHorizontal: 14,
+      paddingVertical: 8,
+    },
+    createBtnTxt: { color: '#fff', fontSize: 13, fontWeight: '700' },
 
-  list: { padding: 16, gap: 12, paddingBottom: 32 },
+    sortRow: { flexDirection: 'row', paddingHorizontal: 16, gap: 8, paddingBottom: 12 },
+    sortChip: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: c.card,
+      borderRadius: 20,
+      paddingHorizontal: 14,
+      paddingVertical: 7,
+      borderWidth: 1,
+      borderColor: c.border,
+    },
+    sortChipOn:    { borderColor: c.accent, backgroundColor: c.accentBg },
+    sortChipTxt:   { color: c.textMuted, fontSize: 13, fontWeight: '600' },
+    sortChipTxtOn: { color: c.accent },
+    sortChipSub:   { color: c.textFaint, fontSize: 10 },
 
-  emptyBox: { alignItems: 'center', paddingTop: 80, gap: 10 },
-  emptyIcon: { fontSize: 56 },
-  emptyTitle: { color: '#fff', fontSize: 18, fontWeight: '700' },
-  emptyDesc: { color: '#666', fontSize: 14 },
-  emptyBtn: {
-    marginTop: 12,
-    backgroundColor: '#00C853',
-    borderRadius: 12,
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-  },
-  emptyBtnTxt: { color: '#fff', fontSize: 15, fontWeight: '700' },
+    list: { padding: 16, gap: 12, paddingBottom: 32 },
 
-  card: {
-    backgroundColor: '#1a1a1a',
-    borderRadius: 18,
-    padding: 18,
-    gap: 8,
-  },
-  myCard: {
-    borderWidth: 1,
-    borderColor: '#00C853',
-  },
-  cardTop: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  myBadge: {
-    backgroundColor: '#00C85322',
-    borderRadius: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-  },
-  myBadgeTxt: { color: '#00C853', fontSize: 11, fontWeight: '700' },
-  distBadge: {
-    backgroundColor: '#002a14',
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-  },
-  distTxt: { color: '#00C853', fontSize: 14, fontWeight: '800' },
-  nowBadge: {
-    backgroundColor: '#FF453A22',
-    borderRadius: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-  },
-  nowTxt: { color: '#FF453A', fontSize: 12, fontWeight: '700' },
-  timeUntil: { color: '#555', fontSize: 12, marginLeft: 'auto' },
-  cardTitle: { color: '#fff', fontSize: 17, fontWeight: '800', lineHeight: 24 },
-  cardTime: { color: '#aaa', fontSize: 13, fontWeight: '500' },
-  cardCreator: { color: '#555', fontSize: 12 },
+    emptyBox:   { alignItems: 'center', paddingTop: 80, gap: 10 },
+    emptyIcon:  { fontSize: 56 },
+    emptyTitle: { color: c.text, fontSize: 18, fontWeight: '700' },
+    emptyDesc:  { color: c.textMuted, fontSize: 14 },
+    emptyBtn: {
+      marginTop: 12,
+      backgroundColor: c.accent,
+      borderRadius: 12,
+      paddingHorizontal: 24,
+      paddingVertical: 12,
+    },
+    emptyBtnTxt: { color: '#fff', fontSize: 15, fontWeight: '700' },
 
-  cardBottom: { flexDirection: 'row', alignItems: 'center', marginTop: 4 },
-  partCount: { flex: 1, color: '#888', fontSize: 13 },
-  cardBtns: { flexDirection: 'row', gap: 8, alignItems: 'center' },
-  cancelChalBtn: {
-    backgroundColor: '#3a1a1a',
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderWidth: 1,
-    borderColor: '#FF453A44',
-  },
-  cancelChalBtnTxt: { color: '#FF453A', fontSize: 12, fontWeight: '700' },
-  leaveChalBtn: {
-    backgroundColor: '#2a2a2a',
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  leaveChalBtnTxt: { color: '#888', fontSize: 12, fontWeight: '600' },
-  joinBtn: {
-    backgroundColor: '#00C853',
-    borderRadius: 10,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-  },
-  joinBtnEnter: { backgroundColor: '#FF9500' },
-  joinBtnJoined: { backgroundColor: '#2a2a2a' },
-  joinBtnFull: { backgroundColor: '#2a2a2a' },
-  joinBtnTxt: { color: '#fff', fontSize: 13, fontWeight: '700' },
-  joinBtnTxtJoined: { color: '#555' },
+    card:   { backgroundColor: c.card, borderRadius: 18, padding: 18, gap: 8 },
+    myCard: { borderWidth: 1, borderColor: c.accent },
 
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: '#000000bb',
-    justifyContent: 'flex-end',
-  },
-  modal: {
-    backgroundColor: '#1a1a1a',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    padding: 24,
-    paddingBottom: Platform.OS === 'ios' ? 48 : 28,
-    gap: 6,
-  },
-  modalTitle: { color: '#fff', fontSize: 18, fontWeight: '800', marginBottom: 10 },
-  fieldLabel: { color: '#888', fontSize: 12, fontWeight: '600', marginTop: 8 },
-  titleInput: { fontSize: 15, marginTop: 4 },
-  charCount: { color: '#444', fontSize: 11, textAlign: 'right', marginTop: 3 },
-  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4 },
-  chip: {
-    backgroundColor: '#2a2a2a',
-    borderRadius: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-  },
-  chipOn: { backgroundColor: '#00C853' },
-  chipTxt: { color: '#888', fontSize: 14, fontWeight: '600' },
-  chipTxtOn: { color: '#fff' },
-  input: {
-    backgroundColor: '#242424',
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 11,
-    color: '#fff',
-    fontSize: 16,
-    marginTop: 4,
-  },
-  modalBtns: { flexDirection: 'row', gap: 10, marginTop: 18 },
-  cancelBtn: {
-    flex: 1,
-    backgroundColor: '#2a2a2a',
-    borderRadius: 12,
-    paddingVertical: 14,
-    alignItems: 'center',
-  },
-  cancelBtnTxt: { color: '#888', fontSize: 15, fontWeight: '600' },
-  confirmBtn: {
-    flex: 2,
-    backgroundColor: '#00C853',
-    borderRadius: 12,
-    paddingVertical: 14,
-    alignItems: 'center',
-  },
-  confirmBtnTxt: { color: '#fff', fontSize: 15, fontWeight: '700' },
-});
+    cardTop: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    myBadge: {
+      backgroundColor: c.accentBg,
+      borderRadius: 8,
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+    },
+    myBadgeTxt: { color: c.accent, fontSize: 11, fontWeight: '700' },
+    distBadge: {
+      backgroundColor: c.accentBg,
+      borderRadius: 8,
+      paddingHorizontal: 10,
+      paddingVertical: 4,
+    },
+    distTxt:   { color: c.accent, fontSize: 14, fontWeight: '800' },
+    nowBadge:  { backgroundColor: 'rgba(255,69,58,0.13)', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 },
+    nowTxt:    { color: '#FF453A', fontSize: 12, fontWeight: '700' },
+    timeUntil: { color: c.textFaint, fontSize: 12, marginLeft: 'auto' },
+    cardTitle:   { color: c.text, fontSize: 17, fontWeight: '800', lineHeight: 24 },
+    cardTime:    { color: c.textSub, fontSize: 13, fontWeight: '500' },
+    cardCreator: { color: c.textFaint, fontSize: 12 },
+
+    cardBottom: { flexDirection: 'row', alignItems: 'center', marginTop: 4 },
+    partCount:  { flex: 1, color: c.textMuted, fontSize: 13 },
+    cardBtns:   { flexDirection: 'row', gap: 8, alignItems: 'center' },
+    cancelChalBtn: {
+      backgroundColor: '#3a1a1a',
+      borderRadius: 10,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      borderWidth: 1,
+      borderColor: '#FF453A44',
+    },
+    cancelChalBtnTxt: { color: '#FF453A', fontSize: 12, fontWeight: '700' },
+    leaveChalBtn: {
+      backgroundColor: c.card2,
+      borderRadius: 10,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+    },
+    leaveChalBtnTxt: { color: c.textMuted, fontSize: 12, fontWeight: '600' },
+    joinBtn: {
+      backgroundColor: c.accent,
+      borderRadius: 10,
+      paddingHorizontal: 16,
+      paddingVertical: 8,
+    },
+    joinBtnEnter:     { backgroundColor: '#FF9500' },
+    joinBtnJoined:    { backgroundColor: c.card2 },
+    joinBtnFull:      { backgroundColor: c.card2 },
+    joinBtnTxt:       { color: '#fff', fontSize: 13, fontWeight: '700' },
+    joinBtnTxtJoined: { color: c.textFaint },
+
+    modalOverlay: { flex: 1, backgroundColor: '#000000bb', justifyContent: 'flex-end' },
+    modal: {
+      backgroundColor: c.card,
+      borderTopLeftRadius: 24,
+      borderTopRightRadius: 24,
+      padding: 24,
+      paddingBottom: Platform.OS === 'ios' ? 48 : 28,
+      gap: 6,
+    },
+    modalTitle: { color: c.text, fontSize: 18, fontWeight: '800', marginBottom: 10 },
+    fieldLabel: { color: c.textMuted, fontSize: 12, fontWeight: '600', marginTop: 8 },
+    titleInput: { fontSize: 15, marginTop: 4 },
+    charCount:  { color: c.textFaint, fontSize: 11, textAlign: 'right', marginTop: 3 },
+    chipRow:    { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4 },
+    chip:       { backgroundColor: c.card2, borderRadius: 8, paddingHorizontal: 14, paddingVertical: 7 },
+    chipOn:     { backgroundColor: c.accent },
+    chipTxt:    { color: c.textMuted, fontSize: 14, fontWeight: '600' },
+    chipTxtOn:  { color: '#fff' },
+    input: {
+      backgroundColor: c.card3,
+      borderRadius: 10,
+      paddingHorizontal: 14,
+      paddingVertical: 11,
+      color: c.text,
+      fontSize: 16,
+      marginTop: 4,
+    },
+    modalBtns: { flexDirection: 'row', gap: 10, marginTop: 18 },
+    cancelBtn: {
+      flex: 1,
+      backgroundColor: c.card2,
+      borderRadius: 12,
+      paddingVertical: 14,
+      alignItems: 'center',
+    },
+    cancelBtnTxt: { color: c.textMuted, fontSize: 15, fontWeight: '600' },
+    confirmBtn: {
+      flex: 2,
+      backgroundColor: c.accent,
+      borderRadius: 12,
+      paddingVertical: 14,
+      alignItems: 'center',
+    },
+    confirmBtnTxt: { color: '#fff', fontSize: 15, fontWeight: '700' },
+  });
+}

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, Alert,
   Animated, Platform,
@@ -9,6 +9,8 @@ import {
   updateProgress, subscribeProgress, startChallenge, finishChallenge,
   saveBattleRecord,
 } from '../services/challengeService';
+import { useTheme } from '../context/ThemeContext';
+import { Colors } from '../theme';
 
 interface Props {
   challenge: Challenge;
@@ -41,25 +43,27 @@ function ordinalKo(rank: number): string {
 }
 
 export default function BattleRunScreen({ challenge, profile, onFinish }: Props) {
-  const [running, setRunning] = useState(false);
-  const [distanceM, setDistanceM] = useState(0);
-  const [durationS, setDurationS] = useState(0);
+  const [running, setRunning]       = useState(false);
+  const [distanceM, setDistanceM]   = useState(0);
+  const [durationS, setDurationS]   = useState(0);
   const [leaderboard, setLeaderboard] = useState<ChallengeProgress[]>([]);
-  const [rankPopup, setRankPopup] = useState<string | null>(null);
+  const [rankPopup, setRankPopup]   = useState<string | null>(null);
   const popupAnim = useRef(new Animated.Value(0)).current;
-  const lastRankRef = useRef<number>(0);
-  const distRef = useRef(0);
-  const durRef = useRef(0);
-  const lastCoordRef = useRef<{ lat: number; lon: number } | null>(null);
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const progressRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const lastRankRef    = useRef<number>(0);
+  const distRef        = useRef(0);
+  const durRef         = useRef(0);
+  const lastCoordRef   = useRef<{ lat: number; lon: number } | null>(null);
+  const timerRef       = useRef<ReturnType<typeof setInterval> | null>(null);
+  const progressRef    = useRef<ReturnType<typeof setInterval> | null>(null);
   const locationSubRef = useRef<Location.LocationSubscription | null>(null);
   const unsubscribeRef = useRef<(() => void) | null>(null);
-  const finished = useRef(false);
+  const finished       = useRef(false);
+
+  const { colors } = useTheme();
+  const s = useMemo(() => makeStyles(colors), [colors]);
 
   const targetM = challenge.distanceKm * 1000;
 
-  // 실시간 리더보드 구독
   useEffect(() => {
     unsubscribeRef.current = subscribeProgress(challenge.id, entries => {
       setLeaderboard(entries);
@@ -67,7 +71,6 @@ export default function BattleRunScreen({ challenge, profile, onFinish }: Props)
     return () => { unsubscribeRef.current?.(); };
   }, [challenge.id]);
 
-  // 랭크 팝업 표시
   const showRankPopup = useCallback((msg: string) => {
     setRankPopup(msg);
     popupAnim.setValue(0);
@@ -78,7 +81,6 @@ export default function BattleRunScreen({ challenge, profile, onFinish }: Props)
     ]).start(() => setRankPopup(null));
   }, [popupAnim]);
 
-  // 랭크 변화 감지 → 팝업
   useEffect(() => {
     if (!running || leaderboard.length < 2) return;
     const myRank = getMyRank(profile.id, leaderboard);
@@ -100,20 +102,18 @@ export default function BattleRunScreen({ challenge, profile, onFinish }: Props)
     setRunning(true);
     await startChallenge(challenge.id);
 
-    // 타이머
     timerRef.current = setInterval(() => {
       durRef.current += 1;
       setDurationS(durRef.current);
     }, 1000);
 
-    // GPS
     locationSubRef.current = await Location.watchPositionAsync(
       { accuracy: Location.Accuracy.BestForNavigation, distanceInterval: 5 },
       loc => {
         const { latitude, longitude } = loc.coords;
         if (lastCoordRef.current) {
           const d = haversine(lastCoordRef.current.lat, lastCoordRef.current.lon, latitude, longitude);
-          if (d < 50) { // 스파이크 필터
+          if (d < 50) {
             distRef.current += d;
             setDistanceM(distRef.current);
           }
@@ -122,14 +122,12 @@ export default function BattleRunScreen({ challenge, profile, onFinish }: Props)
       }
     );
 
-    // 5초마다 Firestore 업데이트
     progressRef.current = setInterval(async () => {
       if (finished.current) return;
       await updateProgress(
         challenge.id, profile.id, profile.nickname,
         distRef.current, durRef.current, false,
       );
-      // 목표 거리 달성 체크
       if (distRef.current >= targetM) {
         handleFinish();
       }
@@ -198,7 +196,6 @@ export default function BattleRunScreen({ challenge, profile, onFinish }: Props)
 
   const paceSecPerKm = distanceM > 10 ? (durationS / distanceM) * 1000 : 0;
   const progress = Math.min(distanceM / targetM, 1);
-  const myEntry = leaderboard.find(e => e.userId === profile.id);
   const sortedBoard = [...leaderboard].sort((a, b) => b.distanceM - a.distanceM);
 
   return (
@@ -304,128 +301,118 @@ function haversine(lat1: number, lon1: number, lat2: number, lon2: number): numb
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-const s = StyleSheet.create({
-  bg: { flex: 1, backgroundColor: '#0f0f0f' },
+function makeStyles(c: Colors) {
+  return StyleSheet.create({
+    bg: { flex: 1, backgroundColor: c.bg },
 
-  topBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: Platform.OS === 'ios' ? 60 : 36,
-    paddingBottom: 12,
-  },
-  challengeNameWrap: { flex: 1, gap: 2 },
-  challengeTitle: { color: '#fff', fontSize: 16, fontWeight: '800' },
-  challengeSub: { color: '#666', fontSize: 12 },
-  stopBtn: {
-    backgroundColor: '#3a1a1a',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-  },
-  stopTxt: { color: '#FF453A', fontSize: 13, fontWeight: '700' },
+    topBar: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 20,
+      paddingTop: Platform.OS === 'ios' ? 60 : 36,
+      paddingBottom: 12,
+    },
+    challengeNameWrap: { flex: 1, gap: 2 },
+    challengeTitle:    { color: c.text, fontSize: 16, fontWeight: '800' },
+    challengeSub:      { color: c.textMuted, fontSize: 12 },
+    stopBtn: {
+      backgroundColor: '#3a1a1a',
+      borderRadius: 8,
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+    },
+    stopTxt: { color: '#FF453A', fontSize: 13, fontWeight: '700' },
 
-  myStats: {
-    flexDirection: 'row',
-    backgroundColor: '#1a1a1a',
-    marginHorizontal: 16,
-    borderRadius: 20,
-    padding: 20,
-    alignItems: 'center',
-  },
-  statCol: { flex: 1, alignItems: 'center', gap: 2 },
-  statBig: { color: '#00C853', fontSize: 22, fontWeight: '800' },
-  statUnit: { color: '#555', fontSize: 11 },
-  statDiv: { width: 1, height: 36, backgroundColor: '#2a2a2a' },
+    myStats: {
+      flexDirection: 'row',
+      backgroundColor: c.card,
+      marginHorizontal: 16,
+      borderRadius: 20,
+      padding: 20,
+      alignItems: 'center',
+    },
+    statCol:  { flex: 1, alignItems: 'center', gap: 2 },
+    statBig:  { color: c.accent, fontSize: 22, fontWeight: '800' },
+    statUnit: { color: c.textFaint, fontSize: 11 },
+    statDiv:  { width: 1, height: 36, backgroundColor: c.border },
 
-  progressBarBg: {
-    height: 6,
-    backgroundColor: '#2a2a2a',
-    borderRadius: 3,
-    marginHorizontal: 16,
-    marginTop: 16,
-    overflow: 'hidden',
-  },
-  progressBarFill: {
-    height: 6,
-    backgroundColor: '#00C853',
-    borderRadius: 3,
-  },
-  progressTxt: {
-    color: '#555',
-    fontSize: 12,
-    textAlign: 'right',
-    marginRight: 16,
-    marginTop: 4,
-  },
+    progressBarBg: {
+      height: 6,
+      backgroundColor: c.card2,
+      borderRadius: 3,
+      marginHorizontal: 16,
+      marginTop: 16,
+      overflow: 'hidden',
+    },
+    progressBarFill: { height: 6, backgroundColor: c.accent, borderRadius: 3 },
+    progressTxt: {
+      color: c.textFaint,
+      fontSize: 12,
+      textAlign: 'right',
+      marginRight: 16,
+      marginTop: 4,
+    },
 
-  leaderboard: {
-    flex: 1,
-    backgroundColor: '#1a1a1a',
-    marginHorizontal: 16,
-    marginTop: 16,
-    borderRadius: 20,
-    padding: 16,
-  },
-  leaderTitle: { color: '#666', fontSize: 12, fontWeight: '600', marginBottom: 12 },
-  leaderEmpty: { color: '#444', fontSize: 13, textAlign: 'center', marginTop: 20 },
-  leaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#242424',
-    gap: 8,
-  },
-  leaderRowMe: { backgroundColor: '#002a14', borderRadius: 10, paddingHorizontal: 8 },
-  leaderRank: { color: '#555', fontSize: 16, width: 28, textAlign: 'center' },
-  leaderRankFirst: { color: '#FFD60A' },
-  leaderName: { flex: 1, color: '#ccc', fontSize: 14 },
-  leaderNameMe: { color: '#00C853', fontWeight: '700' },
-  leaderRight: { alignItems: 'flex-end', gap: 2 },
-  leaderDist: { color: '#fff', fontSize: 14, fontWeight: '700' },
-  leaderPace: { color: '#555', fontSize: 11 },
-  finishedBadge: {
-    backgroundColor: '#FFD60A22',
-    color: '#FFD60A',
-    fontSize: 10,
-    fontWeight: '700',
-    borderRadius: 6,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-  },
+    leaderboard: {
+      flex: 1,
+      backgroundColor: c.card,
+      marginHorizontal: 16,
+      marginTop: 16,
+      borderRadius: 20,
+      padding: 16,
+    },
+    leaderTitle: { color: c.textMuted, fontSize: 12, fontWeight: '600', marginBottom: 12 },
+    leaderEmpty: { color: c.textFaint, fontSize: 13, textAlign: 'center', marginTop: 20 },
+    leaderRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 10,
+      borderBottomWidth: 1,
+      borderBottomColor: c.card3,
+      gap: 8,
+    },
+    leaderRowMe:    { backgroundColor: c.rowMeBg, borderRadius: 10, paddingHorizontal: 8 },
+    leaderRank:     { color: c.textFaint, fontSize: 16, width: 28, textAlign: 'center' },
+    leaderRankFirst: { color: '#FFD60A' },
+    leaderName:     { flex: 1, color: c.textSub, fontSize: 14 },
+    leaderNameMe:   { color: c.accent, fontWeight: '700' },
+    leaderRight:    { alignItems: 'flex-end', gap: 2 },
+    leaderDist:     { color: c.text, fontSize: 14, fontWeight: '700' },
+    leaderPace:     { color: c.textFaint, fontSize: 11 },
+    finishedBadge: {
+      backgroundColor: 'rgba(255,214,10,0.13)',
+      color: '#FFD60A',
+      fontSize: 10,
+      fontWeight: '700',
+      borderRadius: 6,
+      paddingHorizontal: 6,
+      paddingVertical: 2,
+    },
 
-  startWrap: {
-    padding: 16,
-    paddingBottom: Platform.OS === 'ios' ? 36 : 20,
-  },
-  startBtn: {
-    backgroundColor: '#00C853',
-    borderRadius: 16,
-    paddingVertical: 18,
-    alignItems: 'center',
-  },
-  startBtnTxt: { color: '#fff', fontSize: 18, fontWeight: '800' },
+    startWrap: { padding: 16, paddingBottom: Platform.OS === 'ios' ? 36 : 20 },
+    startBtn: {
+      backgroundColor: c.accent,
+      borderRadius: 16,
+      paddingVertical: 18,
+      alignItems: 'center',
+    },
+    startBtnTxt: { color: '#fff', fontSize: 18, fontWeight: '800' },
 
-  popup: {
-    position: 'absolute',
-    top: Platform.OS === 'ios' ? 120 : 100,
-    left: 24,
-    right: 24,
-    backgroundColor: '#1a2a1a',
-    borderRadius: 16,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#00C853',
-    shadowColor: '#00C853',
-    shadowOpacity: 0.4,
-    shadowRadius: 12,
-    elevation: 8,
-  },
-  popupTxt: {
-    color: '#00C853',
-    fontSize: 16,
-    fontWeight: '700',
-    textAlign: 'center',
-  },
-});
+    popup: {
+      position: 'absolute',
+      top: Platform.OS === 'ios' ? 120 : 100,
+      left: 24,
+      right: 24,
+      backgroundColor: c.rankBg,
+      borderRadius: 16,
+      padding: 16,
+      borderWidth: 1,
+      borderColor: c.accent,
+      shadowColor: c.accent,
+      shadowOpacity: 0.4,
+      shadowRadius: 12,
+      elevation: 8,
+    },
+    popupTxt: { color: c.accent, fontSize: 16, fontWeight: '700', textAlign: 'center' },
+  });
+}
