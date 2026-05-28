@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, Platform, ActivityIndicator,
   TouchableOpacity, TextInput, KeyboardAvoidingView, FlatList,
@@ -6,6 +6,8 @@ import {
 import { RunRecord, RunSegment, UserProfile } from '../types';
 import { getUserRunHistory, formatMonthLabel } from '../services/rankingService';
 import { sendAIMessage, ChatMessage } from '../services/aiService';
+import { useTheme } from '../context/ThemeContext';
+import { Colors } from '../theme';
 
 interface Props {
   profile: UserProfile | null;
@@ -79,11 +81,14 @@ interface AiCoachProps {
 
 function AiCoachTab({ profile, history }: AiCoachProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [input, setInput] = useState('');
-  const [sending, setSending] = useState(false);
-  const [elapsed, setElapsed] = useState(0);
-  const flatRef = useRef<FlatList<ChatMessage>>(null);
+  const [input, setInput]       = useState('');
+  const [sending, setSending]   = useState(false);
+  const [elapsed, setElapsed]   = useState(0);
+  const flatRef  = useRef<FlatList<ChatMessage>>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const { colors } = useTheme();
+  const ai = useMemo(() => makeAiStyles(colors), [colors]);
 
   useEffect(() => {
     if (sending) {
@@ -96,8 +101,6 @@ function AiCoachTab({ profile, history }: AiCoachProps) {
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
   }, [sending]);
 
-  // Extract most recent run's segments from local storage
-  // (passed via history metadata — we use a best-effort reconstruction)
   const recentSegments: RunSegment[] | undefined = undefined;
 
   async function send(text: string) {
@@ -191,7 +194,7 @@ function AiCoachTab({ profile, history }: AiCoachProps) {
         <TextInput
           style={ai.input}
           placeholder="러닝에 대해 질문하세요..."
-          placeholderTextColor="#555"
+          placeholderTextColor={colors.textFaint}
           value={input}
           onChangeText={setInput}
           onSubmitEditing={() => send(input)}
@@ -213,10 +216,13 @@ function AiCoachTab({ profile, history }: AiCoachProps) {
 // ── 메인 화면 ─────────────────────────────────────────────────────
 
 export default function RunHistoryScreen({ profile }: Props) {
-  const [groups, setGroups] = useState<MonthGroup[]>([]);
+  const [groups, setGroups]   = useState<MonthGroup[]>([]);
   const [history, setHistory] = useState<RunRecord[]>([]);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<'records' | 'ai'>('records');
+  const [tab, setTab]         = useState<'records' | 'ai'>('records');
+
+  const { colors } = useTheme();
+  const s = useMemo(() => makeStyles(colors), [colors]);
 
   useEffect(() => {
     getUserRunHistory(profile?.id ?? '').then(records => {
@@ -255,7 +261,7 @@ export default function RunHistoryScreen({ profile }: Props) {
       {tab === 'ai' ? (
         <AiCoachTab profile={profile} history={history} />
       ) : loading ? (
-        <ActivityIndicator color="#00C853" style={{ marginTop: 60 }} />
+        <ActivityIndicator color={colors.accent} style={{ marginTop: 60 }} />
       ) : (
         <ScrollView style={s.scroll} contentContainerStyle={s.scrollContent}>
           {/* 전체 요약 */}
@@ -349,178 +355,153 @@ export default function RunHistoryScreen({ profile }: Props) {
 
 // ── 스타일 ────────────────────────────────────────────────────────
 
-const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0f0f0f' },
+function makeStyles(c: Colors) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: c.bg },
 
-  header: {
-    paddingTop: Platform.OS === 'ios' ? 60 : 40,
-    paddingHorizontal: 20,
-    paddingBottom: 0,
-  },
-  headerTitle: { color: '#fff', fontSize: 22, fontWeight: '800', marginBottom: 14 },
+    header: {
+      paddingTop: Platform.OS === 'ios' ? 60 : 40,
+      paddingHorizontal: 20,
+      paddingBottom: 0,
+    },
+    headerTitle: { color: c.text, fontSize: 22, fontWeight: '800', marginBottom: 14 },
 
-  tabRow: { flexDirection: 'row', gap: 8, marginBottom: 4 },
-  tabBtn: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: '#1a1a1a',
-  },
-  tabBtnOn: { backgroundColor: '#00C853' },
-  tabBtnTxt: { color: '#666', fontSize: 13, fontWeight: '600' },
-  tabBtnTxtOn: { color: '#fff' },
+    tabRow:      { flexDirection: 'row', gap: 8, marginBottom: 4 },
+    tabBtn:      { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, backgroundColor: c.card },
+    tabBtnOn:    { backgroundColor: c.accent },
+    tabBtnTxt:   { color: c.textMuted, fontSize: 13, fontWeight: '600' },
+    tabBtnTxtOn: { color: '#fff' },
 
-  scroll: { flex: 1 },
-  scrollContent: { padding: 16, paddingBottom: 32, gap: 16 },
+    scroll:        { flex: 1 },
+    scrollContent: { padding: 16, paddingBottom: 32, gap: 16 },
 
-  totalCard: { backgroundColor: '#1a1a1a', borderRadius: 20, padding: 20 },
-  totalTitle: { color: '#666', fontSize: 12, fontWeight: '600', marginBottom: 16 },
-  totalRow: { flexDirection: 'row', alignItems: 'center' },
-  totalItem: { flex: 1, alignItems: 'center' },
-  totalBig: { color: '#00C853', fontSize: 26, fontWeight: '800' },
-  totalLbl: { color: '#666', fontSize: 11, marginTop: 4 },
-  totalDivider: { width: 1, height: 40, backgroundColor: '#2a2a2a' },
+    totalCard:    { backgroundColor: c.card, borderRadius: 20, padding: 20 },
+    totalTitle:   { color: c.textMuted, fontSize: 12, fontWeight: '600', marginBottom: 16 },
+    totalRow:     { flexDirection: 'row', alignItems: 'center' },
+    totalItem:    { flex: 1, alignItems: 'center' },
+    totalBig:     { color: c.accent, fontSize: 26, fontWeight: '800' },
+    totalLbl:     { color: c.textMuted, fontSize: 11, marginTop: 4 },
+    totalDivider: { width: 1, height: 40, backgroundColor: c.border },
 
-  monthSection: { gap: 8 },
-  monthHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 4,
-  },
-  monthTitle: { color: '#aaa', fontSize: 14, fontWeight: '700' },
-  monthBadgeRow: { flexDirection: 'row', gap: 6 },
-  monthBadge: {
-    backgroundColor: '#242424',
-    borderRadius: 10,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-  },
-  monthBadgeTxt: { color: '#777', fontSize: 11, fontWeight: '600' },
+    monthSection: { gap: 8 },
+    monthHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 4,
+    },
+    monthTitle:     { color: c.textSub, fontSize: 14, fontWeight: '700' },
+    monthBadgeRow:  { flexDirection: 'row', gap: 6 },
+    monthBadge:     { backgroundColor: c.card3, borderRadius: 10, paddingHorizontal: 8, paddingVertical: 3 },
+    monthBadgeTxt:  { color: c.textMuted, fontSize: 11, fontWeight: '600' },
 
-  runList: { backgroundColor: '#1a1a1a', borderRadius: 16, overflow: 'hidden' },
-  runCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-  },
-  runCardBorder: { borderBottomWidth: 1, borderBottomColor: '#242424' },
-  runLeft: { flex: 1, gap: 5 },
-  runDateRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  runDate: { color: '#ccc', fontSize: 14, fontWeight: '600' },
-  offBadge: {
-    backgroundColor: '#2a1a0a',
-    borderRadius: 6,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-  },
-  offBadgeTxt: { color: '#FFD60A', fontSize: 10, fontWeight: '700' },
-  runMetaRow: { flexDirection: 'row', gap: 4 },
-  runMeta: { color: '#555', fontSize: 12 },
-  runRight: { alignItems: 'flex-end' },
-  runKm: { color: '#00C853', fontSize: 22, fontWeight: '800' },
-  runKmUnit: { color: '#555', fontSize: 11 },
+    runList:       { backgroundColor: c.card, borderRadius: 16, overflow: 'hidden' },
+    runCard:       { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 16 },
+    runCardBorder: { borderBottomWidth: 1, borderBottomColor: c.card3 },
+    runLeft:       { flex: 1, gap: 5 },
+    runDateRow:    { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    runDate:       { color: c.textSub, fontSize: 14, fontWeight: '600' },
+    offBadge:      { backgroundColor: '#2a1a0a', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 },
+    offBadgeTxt:   { color: '#FFD60A', fontSize: 10, fontWeight: '700' },
+    runMetaRow:    { flexDirection: 'row', gap: 4 },
+    runMeta:       { color: c.textFaint, fontSize: 12 },
+    runRight:      { alignItems: 'flex-end' },
+    runKm:         { color: c.accent, fontSize: 22, fontWeight: '800' },
+    runKmUnit:     { color: c.textFaint, fontSize: 11 },
 
-  empty: { alignItems: 'center', paddingTop: 60, gap: 12 },
-  emptyIcon: { fontSize: 52 },
-  emptyTitle: { color: '#fff', fontSize: 18, fontWeight: '700' },
-  emptyDesc: { color: '#555', fontSize: 14, textAlign: 'center', lineHeight: 20 },
-});
+    empty:      { alignItems: 'center', paddingTop: 60, gap: 12 },
+    emptyIcon:  { fontSize: 52 },
+    emptyTitle: { color: c.text, fontSize: 18, fontWeight: '700' },
+    emptyDesc:  { color: c.textFaint, fontSize: 14, textAlign: 'center', lineHeight: 20 },
+  });
+}
 
-const ai = StyleSheet.create({
-  container: { flex: 1 },
+function makeAiStyles(c: Colors) {
+  return StyleSheet.create({
+    container: { flex: 1 },
 
-  introScroll: { flex: 1 },
-  introContent: {
-    padding: 24,
-    alignItems: 'center',
-    paddingBottom: 32,
-  },
-  introIcon: { fontSize: 52, marginBottom: 12, marginTop: 8 },
-  introTitle: { color: '#fff', fontSize: 20, fontWeight: '800', marginBottom: 8 },
-  introDesc: {
-    color: '#666',
-    fontSize: 14,
-    textAlign: 'center',
-    lineHeight: 20,
-    marginBottom: 16,
-  },
-  noDataBadge: {
-    backgroundColor: '#1a1a1a',
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 20,
-  },
-  noDataTxt: { color: '#666', fontSize: 12, textAlign: 'center' },
-  suggestLabel: {
-    color: '#555',
-    fontSize: 12,
-    fontWeight: '600',
-    alignSelf: 'flex-start',
-    marginBottom: 10,
-  },
-  suggestGrid: { width: '100%', gap: 8 },
-  suggestChip: {
-    backgroundColor: '#1a1a1a',
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    borderWidth: 1,
-    borderColor: '#2a2a2a',
-  },
-  suggestTxt: { color: '#bbb', fontSize: 14 },
+    introScroll:   { flex: 1 },
+    introContent:  { padding: 24, alignItems: 'center', paddingBottom: 32 },
+    introIcon:     { fontSize: 52, marginBottom: 12, marginTop: 8 },
+    introTitle:    { color: c.text, fontSize: 20, fontWeight: '800', marginBottom: 8 },
+    introDesc: {
+      color: c.textMuted,
+      fontSize: 14,
+      textAlign: 'center',
+      lineHeight: 20,
+      marginBottom: 16,
+    },
+    noDataBadge: { backgroundColor: c.card, borderRadius: 12, padding: 12, marginBottom: 20 },
+    noDataTxt:   { color: c.textMuted, fontSize: 12, textAlign: 'center' },
+    suggestLabel: {
+      color: c.textFaint,
+      fontSize: 12,
+      fontWeight: '600',
+      alignSelf: 'flex-start',
+      marginBottom: 10,
+    },
+    suggestGrid: { width: '100%', gap: 8 },
+    suggestChip: {
+      backgroundColor: c.card,
+      borderRadius: 12,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      borderWidth: 1,
+      borderColor: c.border,
+    },
+    suggestTxt: { color: c.textSub, fontSize: 14 },
 
-  chatContent: { padding: 16, paddingBottom: 8, gap: 10 },
-  bubble: {
-    maxWidth: '85%',
-    borderRadius: 16,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-  },
-  bubbleUser: {
-    alignSelf: 'flex-end',
-    backgroundColor: '#00C853',
-    borderBottomRightRadius: 4,
-  },
-  bubbleAI: {
-    alignSelf: 'flex-start',
-    backgroundColor: '#1a1a1a',
-    borderBottomLeftRadius: 4,
-  },
-  bubbleTxt: { fontSize: 14, lineHeight: 20 },
-  bubbleTxtUser: { color: '#fff' },
-  bubbleTxtAI: { color: '#ddd' },
-  thinkingTxt: { color: '#00C853', fontSize: 14 },
+    chatContent: { padding: 16, paddingBottom: 8, gap: 10 },
+    bubble: {
+      maxWidth: '85%',
+      borderRadius: 16,
+      paddingHorizontal: 14,
+      paddingVertical: 10,
+    },
+    bubbleUser: {
+      alignSelf: 'flex-end',
+      backgroundColor: c.accent,
+      borderBottomRightRadius: 4,
+    },
+    bubbleAI: {
+      alignSelf: 'flex-start',
+      backgroundColor: c.card,
+      borderBottomLeftRadius: 4,
+    },
+    bubbleTxt:     { fontSize: 14, lineHeight: 20 },
+    bubbleTxtUser: { color: '#fff' },
+    bubbleTxtAI:   { color: c.textSub },
+    thinkingTxt:   { color: c.accent, fontSize: 14 },
 
-  inputRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    gap: 8,
-    padding: 12,
-    paddingBottom: Platform.OS === 'ios' ? 28 : 12,
-    backgroundColor: '#111',
-    borderTopWidth: 1,
-    borderTopColor: '#222',
-  },
-  input: {
-    flex: 1,
-    backgroundColor: '#1a1a1a',
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    color: '#fff',
-    fontSize: 14,
-    maxHeight: 100,
-    borderWidth: 1,
-    borderColor: '#2a2a2a',
-  },
-  sendBtn: {
-    backgroundColor: '#00C853',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 11,
-  },
-  sendBtnOff: { opacity: 0.4 },
-  sendBtnTxt: { color: '#fff', fontSize: 14, fontWeight: '700' },
-});
+    inputRow: {
+      flexDirection: 'row',
+      alignItems: 'flex-end',
+      gap: 8,
+      padding: 12,
+      paddingBottom: Platform.OS === 'ios' ? 28 : 12,
+      backgroundColor: c.tabBg,
+      borderTopWidth: 1,
+      borderTopColor: c.tabBorder,
+    },
+    input: {
+      flex: 1,
+      backgroundColor: c.card,
+      borderRadius: 12,
+      paddingHorizontal: 14,
+      paddingVertical: 10,
+      color: c.text,
+      fontSize: 14,
+      maxHeight: 100,
+      borderWidth: 1,
+      borderColor: c.border,
+    },
+    sendBtn: {
+      backgroundColor: c.accent,
+      borderRadius: 12,
+      paddingHorizontal: 16,
+      paddingVertical: 11,
+    },
+    sendBtnOff: { opacity: 0.4 },
+    sendBtnTxt: { color: '#fff', fontSize: 14, fontWeight: '700' },
+  });
+}

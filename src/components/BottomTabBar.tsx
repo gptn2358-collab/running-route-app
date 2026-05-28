@@ -1,5 +1,7 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
+import { useTheme } from '../context/ThemeContext';
+import { Colors } from '../theme';
 
 export type TabKey = 'home' | 'records' | 'ranking' | 'mypage';
 
@@ -22,6 +24,9 @@ interface Props {
 }
 
 export default function BottomTabBar({ active, onChange }: Props) {
+  const { colors } = useTheme();
+  const s = useMemo(() => makeStyles(colors), [colors]);
+
   return (
     <View style={s.container}>
       {TABS.map(tab => {
@@ -43,28 +48,30 @@ export default function BottomTabBar({ active, onChange }: Props) {
   );
 }
 
-const s = StyleSheet.create({
-  container: {
-    flexDirection: 'row',
-    backgroundColor: '#111',
-    borderTopWidth: 1,
-    borderTopColor: '#222',
-    paddingBottom: Platform.OS === 'ios' ? 24 : 8,
-    paddingTop: 10,
-  },
-  tab: {
-    flex: 1,
-    alignItems: 'center',
-    gap: 3,
-  },
-  icon: { fontSize: 22 },
-  label: { color: '#555', fontSize: 10, fontWeight: '600' },
-  labelOn: { color: '#00C853' },
-  dot: {
-    width: 4,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: '#00C853',
-    marginTop: 2,
-  },
-});
+function makeStyles(c: Colors) {
+  return StyleSheet.create({
+    container: {
+      flexDirection: 'row',
+      backgroundColor: c.tabBg,
+      borderTopWidth: 1,
+      borderTopColor: c.tabBorder,
+      paddingBottom: Platform.OS === 'ios' ? 24 : 8,
+      paddingTop: 10,
+    },
+    tab: {
+      flex: 1,
+      alignItems: 'center',
+      gap: 3,
+    },
+    icon:    { fontSize: 22 },
+    label:   { color: c.textFaint, fontSize: 10, fontWeight: '600' },
+    labelOn: { color: c.accent },
+    dot: {
+      width: 4,
+      height: 4,
+      borderRadius: 2,
+      backgroundColor: c.accent,
+      marginTop: 2,
+    },
+  });
+}

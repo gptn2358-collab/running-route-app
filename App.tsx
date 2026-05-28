@@ -22,6 +22,7 @@ import AuthScreen         from './src/screens/AuthScreen';
 import ProfileSetupScreen from './src/screens/ProfileSetupScreen';
 import BottomTabBar, { TabKey } from './src/components/BottomTabBar';
 
+import { ThemeProvider }                         from './src/context/ThemeContext';
 import { generateBestRoutes }                    from './src/services/routingService';
 import { saveRoute }                             from './src/services/routeStorageService';
 import { loadProfile, saveProfile }              from './src/services/userService';
@@ -35,7 +36,7 @@ import {
 
 type RunFlow = 'selecting' | 'preview' | 'running' | 'review' | 'summary';
 
-export default function App() {
+function AppContent() {
   // ── 탭 상태 ────────────────────────────────────────────────────
   const [activeTab, setActiveTab] = useState<TabKey>('home');
 
@@ -324,3 +325,11 @@ const s = StyleSheet.create({
   tabRoot:    { flex: 1, backgroundColor: '#0f0f0f' },
   tabContent: { flex: 1 },
 });
+
+export default function App() {
+  return (
+    <ThemeProvider>
+      <AppContent />
+    </ThemeProvider>
+  );
+}

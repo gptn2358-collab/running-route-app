@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -14,6 +14,8 @@ import { Coordinate, IssueType, RouteIssue, RouteReview } from '../types';
 import ReviewMapPicker, { ReviewMapPickerHandle } from '../components/ReviewMapPicker';
 import { saveReview } from '../services/reviewService';
 import { reportDiscomfort } from '../services/offZoneService';
+import { useTheme } from '../context/ThemeContext';
+import { Colors } from '../theme';
 
 // ─── Constants ───────────────────────────────────────────────────
 
@@ -56,6 +58,9 @@ export default function ReviewScreen({ trail, routeId, userId, runId, onReviewSu
   const [submitting, setSubmitting]     = useState(false);
 
   const mapRef = useRef<ReviewMapPickerHandle>(null);
+
+  const { colors } = useTheme();
+  const s = useMemo(() => makeStyles(colors), [colors]);
 
   const mapCenter: Coordinate =
     trail.length > 0
@@ -112,7 +117,6 @@ export default function ReviewScreen({ trail, routeId, userId, runId, onReviewSu
       };
       await saveReview(review);
 
-      // 오프구간 신고 전송 (각 불편사항 좌표마다)
       if (issues.length > 0 && userId) {
         await Promise.all(
           issues.map(issue =>
@@ -211,7 +215,7 @@ export default function ReviewScreen({ trail, routeId, userId, runId, onReviewSu
             <TextInput
               style={s.noteInput}
               placeholder="추가 메모 (선택사항)"
-              placeholderTextColor="#555"
+              placeholderTextColor={colors.textFaint}
               value={note}
               onChangeText={setNote}
               maxLength={80}
@@ -306,177 +310,179 @@ export default function ReviewScreen({ trail, routeId, userId, runId, onReviewSu
 
 // ─── Styles ──────────────────────────────────────────────────────
 
-const s = StyleSheet.create({
-  bigEmoji: { fontSize: 52, textAlign: 'center', marginBottom: 10 },
-  title: {
-    color: '#fff',
-    fontSize: 24,
-    fontWeight: '800',
-    textAlign: 'center',
-    marginBottom: 6,
-  },
-  subtitle: {
-    color: '#888',
-    fontSize: 15,
-    textAlign: 'center',
-    marginBottom: 32,
-  },
+function makeStyles(c: Colors) {
+  return StyleSheet.create({
+    bigEmoji: { fontSize: 52, textAlign: 'center', marginBottom: 10 },
+    title: {
+      color: c.text,
+      fontSize: 24,
+      fontWeight: '800',
+      textAlign: 'center',
+      marginBottom: 6,
+    },
+    subtitle: {
+      color: c.textMuted,
+      fontSize: 15,
+      textAlign: 'center',
+      marginBottom: 32,
+    },
 
-  centerScreen: {
-    flex: 1,
-    backgroundColor: '#0f0f0f',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 28,
-  },
-  yesBtn: {
-    backgroundColor: '#FF453A',
-    borderRadius: 14,
-    paddingVertical: 16,
-    width: '100%',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  yesBtnTxt: { color: '#fff', fontSize: 16, fontWeight: '700' },
-  noBtn: {
-    backgroundColor: '#1e1e1e',
-    borderRadius: 14,
-    paddingVertical: 16,
-    width: '100%',
-    alignItems: 'center',
-    borderWidth: 1.5,
-    borderColor: '#00C853',
-  },
-  noBtnTxt: { color: '#00C853', fontSize: 16, fontWeight: '700' },
+    centerScreen: {
+      flex: 1,
+      backgroundColor: c.bg,
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: 28,
+    },
+    yesBtn: {
+      backgroundColor: '#FF453A',
+      borderRadius: 14,
+      paddingVertical: 16,
+      width: '100%',
+      alignItems: 'center',
+      marginBottom: 12,
+    },
+    yesBtnTxt: { color: '#fff', fontSize: 16, fontWeight: '700' },
+    noBtn: {
+      backgroundColor: c.card,
+      borderRadius: 14,
+      paddingVertical: 16,
+      width: '100%',
+      alignItems: 'center',
+      borderWidth: 1.5,
+      borderColor: c.accent,
+    },
+    noBtnTxt: { color: c.accent, fontSize: 16, fontWeight: '700' },
 
-  mapScreen: { flex: 1 },
-  topBar: {
-    position: 'absolute',
-    top: Platform.OS === 'ios' ? 58 : 20,
-    left: 14,
-    right: 14,
-    backgroundColor: 'rgba(10,10,10,0.88)',
-    borderRadius: 16,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    gap: 6,
-  },
-  topBarTitle: { color: '#fff', fontSize: 14, fontWeight: '600', textAlign: 'center' },
-  topBadge: {
-    alignSelf: 'center',
-    backgroundColor: '#2a2a2a',
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-  },
-  topBadgeTxt: { color: '#00C853', fontSize: 12, fontWeight: '600' },
-  issuePanel: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: '#1a1a1a',
-    borderTopLeftRadius: 22,
-    borderTopRightRadius: 22,
-    padding: 20,
-    paddingBottom: Platform.OS === 'ios' ? 40 : 20,
-    gap: 12,
-  },
-  issuePanelTitle: { color: '#fff', fontSize: 16, fontWeight: '700' },
-  typeScroll: { flexGrow: 0 },
-  typeScrollContent: { gap: 8 },
-  typeBtn: {
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 20,
-    backgroundColor: '#2a2a2a',
-    borderWidth: 1.5,
-    borderColor: '#3a3a3a',
-    alignItems: 'center',
-    minWidth: 76,
-  },
-  typeBtnIcon: { fontSize: 18, marginBottom: 3 },
-  typeBtnLbl: { color: '#aaa', fontSize: 11, fontWeight: '600' },
-  typeBtnLblOn: { color: '#fff' },
-  noteInput: {
-    backgroundColor: '#242424',
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    color: '#fff',
-    fontSize: 14,
-  },
-  panelBtns: { flexDirection: 'row', gap: 10 },
-  cancelBtn: {
-    flex: 1,
-    backgroundColor: '#2a2a2a',
-    borderRadius: 12,
-    paddingVertical: 14,
-    alignItems: 'center',
-  },
-  cancelBtnTxt: { color: '#aaa', fontSize: 15, fontWeight: '600' },
-  addBtn: {
-    flex: 2,
-    backgroundColor: '#00C853',
-    borderRadius: 12,
-    paddingVertical: 14,
-    alignItems: 'center',
-  },
-  addBtnOff: { opacity: 0.4 },
-  addBtnTxt: { color: '#fff', fontSize: 15, fontWeight: '700' },
-  bottomBar: {
-    position: 'absolute',
-    bottom: Platform.OS === 'ios' ? 42 : 20,
-    left: 14,
-    right: 14,
-  },
-  nextBtn: {
-    backgroundColor: '#00C853',
-    borderRadius: 14,
-    paddingVertical: 16,
-    alignItems: 'center',
-  },
-  nextBtnTxt: { color: '#fff', fontSize: 15, fontWeight: '700' },
+    mapScreen: { flex: 1 },
+    topBar: {
+      position: 'absolute',
+      top: Platform.OS === 'ios' ? 58 : 20,
+      left: 14,
+      right: 14,
+      backgroundColor: c.overlay,
+      borderRadius: 16,
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      gap: 6,
+    },
+    topBarTitle: { color: c.text, fontSize: 14, fontWeight: '600', textAlign: 'center' },
+    topBadge: {
+      alignSelf: 'center',
+      backgroundColor: c.card2,
+      borderRadius: 12,
+      paddingHorizontal: 12,
+      paddingVertical: 4,
+    },
+    topBadgeTxt: { color: c.accent, fontSize: 12, fontWeight: '600' },
+    issuePanel: {
+      position: 'absolute',
+      bottom: 0,
+      left: 0,
+      right: 0,
+      backgroundColor: c.card,
+      borderTopLeftRadius: 22,
+      borderTopRightRadius: 22,
+      padding: 20,
+      paddingBottom: Platform.OS === 'ios' ? 40 : 20,
+      gap: 12,
+    },
+    issuePanelTitle: { color: c.text, fontSize: 16, fontWeight: '700' },
+    typeScroll:        { flexGrow: 0 },
+    typeScrollContent: { gap: 8 },
+    typeBtn: {
+      paddingHorizontal: 14,
+      paddingVertical: 10,
+      borderRadius: 20,
+      backgroundColor: c.card2,
+      borderWidth: 1.5,
+      borderColor: c.border,
+      alignItems: 'center',
+      minWidth: 76,
+    },
+    typeBtnIcon:  { fontSize: 18, marginBottom: 3 },
+    typeBtnLbl:   { color: c.textSub, fontSize: 11, fontWeight: '600' },
+    typeBtnLblOn: { color: '#fff' },
+    noteInput: {
+      backgroundColor: c.card3,
+      borderRadius: 12,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      color: c.text,
+      fontSize: 14,
+    },
+    panelBtns: { flexDirection: 'row', gap: 10 },
+    cancelBtn: {
+      flex: 1,
+      backgroundColor: c.card2,
+      borderRadius: 12,
+      paddingVertical: 14,
+      alignItems: 'center',
+    },
+    cancelBtnTxt: { color: c.textSub, fontSize: 15, fontWeight: '600' },
+    addBtn: {
+      flex: 2,
+      backgroundColor: c.accent,
+      borderRadius: 12,
+      paddingVertical: 14,
+      alignItems: 'center',
+    },
+    addBtnOff: { opacity: 0.4 },
+    addBtnTxt: { color: '#fff', fontSize: 15, fontWeight: '700' },
+    bottomBar: {
+      position: 'absolute',
+      bottom: Platform.OS === 'ios' ? 42 : 20,
+      left: 14,
+      right: 14,
+    },
+    nextBtn: {
+      backgroundColor: c.accent,
+      borderRadius: 14,
+      paddingVertical: 16,
+      alignItems: 'center',
+    },
+    nextBtnTxt: { color: '#fff', fontSize: 15, fontWeight: '700' },
 
-  ratingBg: { flex: 1, backgroundColor: '#0f0f0f' },
-  ratingContainer: {
-    flexGrow: 1,
-    justifyContent: 'center',
-    padding: 28,
-    paddingBottom: Platform.OS === 'ios' ? 50 : 30,
-  },
-  starsRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 8,
-    marginBottom: 12,
-  },
-  star: { fontSize: 44, color: '#333' },
-  starFilled: { color: '#FFD60A' },
-  ratingLabel: {
-    color: '#aaa',
-    fontSize: 15,
-    textAlign: 'center',
-    marginBottom: 28,
-  },
-  summaryCard: {
-    backgroundColor: '#1a1a1a',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 24,
-    gap: 8,
-  },
-  summaryTitle: { color: '#888', fontSize: 13, fontWeight: '600', marginBottom: 4 },
-  summaryRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  summaryDot: { width: 8, height: 8, borderRadius: 4 },
-  summaryItem: { color: '#ddd', fontSize: 14, flex: 1 },
-  summaryNote: { color: '#888' },
-  submitBtn: {
-    backgroundColor: '#00C853',
-    borderRadius: 14,
-    paddingVertical: 17,
-    alignItems: 'center',
-  },
-  submitBtnOff: { opacity: 0.4 },
-  submitBtnTxt: { color: '#fff', fontSize: 16, fontWeight: '700' },
-});
+    ratingBg: { flex: 1, backgroundColor: c.bg },
+    ratingContainer: {
+      flexGrow: 1,
+      justifyContent: 'center',
+      padding: 28,
+      paddingBottom: Platform.OS === 'ios' ? 50 : 30,
+    },
+    starsRow: {
+      flexDirection: 'row',
+      justifyContent: 'center',
+      gap: 8,
+      marginBottom: 12,
+    },
+    star:       { fontSize: 44, color: c.border },
+    starFilled: { color: '#FFD60A' },
+    ratingLabel: {
+      color: c.textSub,
+      fontSize: 15,
+      textAlign: 'center',
+      marginBottom: 28,
+    },
+    summaryCard: {
+      backgroundColor: c.card,
+      borderRadius: 16,
+      padding: 16,
+      marginBottom: 24,
+      gap: 8,
+    },
+    summaryTitle: { color: c.textMuted, fontSize: 13, fontWeight: '600', marginBottom: 4 },
+    summaryRow:   { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    summaryDot:   { width: 8, height: 8, borderRadius: 4 },
+    summaryItem:  { color: c.textSub, fontSize: 14, flex: 1 },
+    summaryNote:  { color: c.textMuted },
+    submitBtn: {
+      backgroundColor: c.accent,
+      borderRadius: 14,
+      paddingVertical: 17,
+      alignItems: 'center',
+    },
+    submitBtnOff: { opacity: 0.4 },
+    submitBtnTxt: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  });
+}

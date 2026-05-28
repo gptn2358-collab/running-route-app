@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -13,6 +13,8 @@ import {
 } from 'react-native';
 import { UserProfile } from '../types';
 import { generateUserId, checkNicknameAvailable } from '../services/userService';
+import { useTheme } from '../context/ThemeContext';
+import { Colors } from '../theme';
 
 interface Props {
   existing: UserProfile | null;
@@ -22,17 +24,19 @@ interface Props {
 }
 
 export default function ProfileSetupScreen({ existing, defaultUid, onSave, onBack }: Props) {
-  const [nickname, setNickname] = useState(existing?.nickname ?? '');
-  const [optedIn, setOptedIn] = useState(existing?.optedInRanking ?? true);
-  const [checking, setChecking] = useState(false);
+  const [nickname, setNickname]           = useState(existing?.nickname ?? '');
+  const [optedIn, setOptedIn]             = useState(existing?.optedInRanking ?? true);
+  const [checking, setChecking]           = useState(false);
   const [nicknameError, setNicknameError] = useState('');
+
+  const { colors } = useTheme();
+  const s = useMemo(() => makeStyles(colors), [colors]);
 
   async function handleSave() {
     const trimmed = nickname.trim();
     const id = existing?.id ?? defaultUid ?? generateUserId();
     const finalNickname = trimmed || `러너_${id.slice(-4)}`;
 
-    // 닉네임이 변경됐거나 새로 설정하는 경우에만 중복 확인
     const nicknameChanged = finalNickname !== existing?.nickname;
     if (nicknameChanged) {
       setChecking(true);
@@ -76,7 +80,7 @@ export default function ProfileSetupScreen({ existing, defaultUid, onSave, onBac
           <TextInput
             style={[s.input, !!nicknameError && s.inputError]}
             placeholder="예: 한강러너, 북악트레일러"
-            placeholderTextColor="#555"
+            placeholderTextColor={colors.textFaint}
             value={nickname}
             onChangeText={v => { setNickname(v); setNicknameError(''); }}
             maxLength={16}
@@ -99,7 +103,7 @@ export default function ProfileSetupScreen({ existing, defaultUid, onSave, onBac
             <Switch
               value={optedIn}
               onValueChange={setOptedIn}
-              trackColor={{ false: '#333', true: '#00C853' }}
+              trackColor={{ false: '#333', true: colors.accent }}
               thumbColor="#fff"
             />
           </View>
@@ -136,77 +140,74 @@ export default function ProfileSetupScreen({ existing, defaultUid, onSave, onBac
   );
 }
 
-const s = StyleSheet.create({
-  flex: { flex: 1 },
-  bg: { flex: 1, backgroundColor: '#0f0f0f' },
-  container: {
-    flexGrow: 1,
-    padding: 24,
-    paddingBottom: Platform.OS === 'ios' ? 50 : 30,
-  },
-  backBtn: { marginBottom: 16, marginTop: 40 },
-  backTxt: { color: '#00C853', fontSize: 15 },
-  emoji: { fontSize: 56, textAlign: 'center', marginBottom: 12, marginTop: 20 },
-  title: {
-    color: '#fff',
-    fontSize: 26,
-    fontWeight: '800',
-    textAlign: 'center',
-    marginBottom: 8,
-  },
-  subtitle: {
-    color: '#888',
-    fontSize: 14,
-    textAlign: 'center',
-    lineHeight: 22,
-    marginBottom: 32,
-  },
-  card: {
-    backgroundColor: '#1a1a1a',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
-  },
-  label: { color: '#aaa', fontSize: 12, fontWeight: '600', marginBottom: 10 },
-  input: {
-    backgroundColor: '#242424',
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    color: '#fff',
-    fontSize: 16,
-  },
-  hint: { color: '#444', fontSize: 11, marginTop: 6 },
-  inputError: { borderWidth: 1.5, borderColor: '#FF453A' },
-  errorTxt: { color: '#FF453A', fontSize: 12, marginTop: 6 },
-  toggleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  toggleInfo: { flex: 1, paddingRight: 12 },
-  toggleDesc: { color: '#555', fontSize: 12, marginTop: 4 },
-  infoCard: {
-    backgroundColor: '#0d2818',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#1a4a2a',
-  },
-  infoTitle: { color: '#00C853', fontSize: 13, fontWeight: '700', marginBottom: 8 },
-  infoText: { color: '#6a9a7a', fontSize: 12, marginBottom: 4 },
-  infoNote: { color: '#555', fontSize: 11, marginTop: 8 },
-  saveBtn: {
-    backgroundColor: '#00C853',
-    borderRadius: 14,
-    paddingVertical: 17,
-    alignItems: 'center',
-    marginTop: 8,
-    marginBottom: 4,
-  },
-  saveBtnTxt: { color: '#fff', fontSize: 16, fontWeight: '700' },
-  saveBtnOff: { opacity: 0.6 },
-  skipLink: { alignItems: 'center', paddingVertical: 12 },
-  skipTxt: { color: '#444', fontSize: 14 },
-});
+function makeStyles(c: Colors) {
+  return StyleSheet.create({
+    flex: { flex: 1 },
+    bg:   { flex: 1, backgroundColor: c.bg },
+    container: {
+      flexGrow: 1,
+      padding: 24,
+      paddingBottom: Platform.OS === 'ios' ? 50 : 30,
+    },
+    backBtn: { marginBottom: 16, marginTop: 40 },
+    backTxt: { color: c.accent, fontSize: 15 },
+    emoji:   { fontSize: 56, textAlign: 'center', marginBottom: 12, marginTop: 20 },
+    title: {
+      color: c.text,
+      fontSize: 26,
+      fontWeight: '800',
+      textAlign: 'center',
+      marginBottom: 8,
+    },
+    subtitle: {
+      color: c.textMuted,
+      fontSize: 14,
+      textAlign: 'center',
+      lineHeight: 22,
+      marginBottom: 32,
+    },
+    card:  { backgroundColor: c.card, borderRadius: 16, padding: 16, marginBottom: 12 },
+    label: { color: c.textSub, fontSize: 12, fontWeight: '600', marginBottom: 10 },
+    input: {
+      backgroundColor: c.card3,
+      borderRadius: 10,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      color: c.text,
+      fontSize: 16,
+    },
+    hint:       { color: c.textFaint, fontSize: 11, marginTop: 6 },
+    inputError: { borderWidth: 1.5, borderColor: '#FF453A' },
+    errorTxt:   { color: '#FF453A', fontSize: 12, marginTop: 6 },
+    toggleRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+    toggleInfo: { flex: 1, paddingRight: 12 },
+    toggleDesc: { color: c.textFaint, fontSize: 12, marginTop: 4 },
+    infoCard: {
+      backgroundColor: c.accentBg,
+      borderRadius: 16,
+      padding: 16,
+      marginBottom: 12,
+      borderWidth: 1,
+      borderColor: c.accentBorder,
+    },
+    infoTitle: { color: c.accent, fontSize: 13, fontWeight: '700', marginBottom: 8 },
+    infoText:  { color: c.textMuted, fontSize: 12, marginBottom: 4 },
+    infoNote:  { color: c.textFaint, fontSize: 11, marginTop: 8 },
+    saveBtn: {
+      backgroundColor: c.accent,
+      borderRadius: 14,
+      paddingVertical: 17,
+      alignItems: 'center',
+      marginTop: 8,
+      marginBottom: 4,
+    },
+    saveBtnTxt: { color: '#fff', fontSize: 16, fontWeight: '700' },
+    saveBtnOff: { opacity: 0.6 },
+    skipLink:   { alignItems: 'center', paddingVertical: 12 },
+    skipTxt:    { color: c.textFaint, fontSize: 14 },
+  });
+}

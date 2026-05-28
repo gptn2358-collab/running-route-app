@@ -8,8 +8,9 @@ import {
   Platform,
 } from 'react-native';
 import { RouteCandidate, Coordinate } from '../types';
-import { regionForCoordinates } from '../utils/geoUtils';
 import WebMapView, { WebMapViewHandle, CircleConfig } from '../components/WebMapView';
+import { useTheme } from '../context/ThemeContext';
+import { Colors } from '../theme';
 
 interface Props {
   routes: RouteCandidate[];
@@ -41,6 +42,9 @@ export default function RoutePreviewScreen({ routes, start, onStart, onBack }: P
   const mapRef = useRef<WebMapViewHandle>(null);
   const route = routes[idx];
 
+  const { colors } = useTheme();
+  const s = useMemo(() => makeStyles(colors), [colors]);
+
   const applyRoute = (r: RouteCandidate) => {
     mapRef.current?.setPolyline(r.polyline, '#2979FF');
     const circles: CircleConfig[] = r.trafficSignalLocations.map((sig) => ({
@@ -55,17 +59,14 @@ export default function RoutePreviewScreen({ routes, start, onStart, onBack }: P
     mapRef.current?.setStartDirection(r.polyline);
   };
 
-  // 최초 로드 시 경로 표시
   useEffect(() => {
     if (route) applyRoute(route);
   }, []);
 
-  // 경로 탭 변경 시 업데이트
   useEffect(() => {
     if (route) applyRoute(route);
   }, [idx]);
 
-  // 한 번만 계산 — idx가 바뀌어도 source prop이 바뀌지 않아야 WebView가 리로드되지 않음
   const initialCenter = useMemo(() => {
     const coords = routes[0].polyline;
     const lats = coords.map((c) => c.latitude);
@@ -88,12 +89,10 @@ export default function RoutePreviewScreen({ routes, start, onStart, onBack }: P
         style={s.map}
       />
 
-      {/* Back button */}
       <TouchableOpacity style={s.backBtn} onPress={onBack}>
         <Text style={s.backBtnTxt}>← 뒤로</Text>
       </TouchableOpacity>
 
-      {/* Legend */}
       <View style={s.legend}>
         <View style={s.legendDot} />
         <Text style={s.legendTxt}>빨간 원 = 신호등 위치</Text>
@@ -149,84 +148,86 @@ export default function RoutePreviewScreen({ routes, start, onStart, onBack }: P
   );
 }
 
-const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0f0f0f' },
-  map: { flex: 1 },
-  backBtn: {
-    position: 'absolute',
-    top: Platform.OS === 'ios' ? 58 : 20,
-    left: 16,
-    backgroundColor: 'rgba(0,0,0,0.72)',
-    paddingHorizontal: 16,
-    paddingVertical: 9,
-    borderRadius: 22,
-  },
-  backBtnTxt: { color: '#fff', fontSize: 14, fontWeight: '600' },
-  legend: {
-    position: 'absolute',
-    top: Platform.OS === 'ios' ? 58 : 20,
-    right: 16,
-    backgroundColor: 'rgba(0,0,0,0.72)',
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 16,
-    gap: 6,
-  },
-  legendDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: 'rgba(255,69,58,0.7)',
-    borderWidth: 1.5,
-    borderColor: '#FF453A',
-  },
-  legendTxt: { color: '#ccc', fontSize: 11 },
-  panel: {
-    backgroundColor: '#1a1a1a',
-    borderTopLeftRadius: 22,
-    borderTopRightRadius: 22,
-    marginTop: -22,
-    padding: 16,
-    paddingBottom: Platform.OS === 'ios' ? 36 : 16,
-  },
-  tabScroll: { marginBottom: 12 },
-  tab: {
-    paddingHorizontal: 16,
-    paddingVertical: 9,
-    borderRadius: 20,
-    backgroundColor: '#2a2a2a',
-    marginRight: 8,
-    alignItems: 'center',
-  },
-  tabOn: { backgroundColor: '#00C853' },
-  tabLabel: { color: '#aaa', fontSize: 13, fontWeight: '700' },
-  tabLabelOn: { color: '#fff' },
-  tabSig: { fontSize: 11, marginTop: 2 },
-  statsRow: {
-    flexDirection: 'row',
-    backgroundColor: '#242424',
-    borderRadius: 14,
-    padding: 14,
-    marginBottom: 12,
-  },
-  stat: { flex: 1, alignItems: 'center' },
-  statVal: { color: '#fff', fontSize: 20, fontWeight: '800' },
-  statLbl: { color: '#777', fontSize: 11, marginTop: 3 },
-  divider: { width: 1, backgroundColor: '#333', marginHorizontal: 4 },
-  bonus: {
-    color: '#00C853',
-    fontSize: 13,
-    textAlign: 'center',
-    marginBottom: 10,
-    fontWeight: '600',
-  },
-  startBtn: {
-    backgroundColor: '#00C853',
-    borderRadius: 14,
-    paddingVertical: 16,
-    alignItems: 'center',
-  },
-  startBtnTxt: { color: '#fff', fontSize: 16, fontWeight: '700' },
-});
+function makeStyles(c: Colors) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: c.bg },
+    map: { flex: 1 },
+    backBtn: {
+      position: 'absolute',
+      top: Platform.OS === 'ios' ? 58 : 20,
+      left: 16,
+      backgroundColor: c.overlayLight,
+      paddingHorizontal: 16,
+      paddingVertical: 9,
+      borderRadius: 22,
+    },
+    backBtnTxt: { color: '#fff', fontSize: 14, fontWeight: '600' },
+    legend: {
+      position: 'absolute',
+      top: Platform.OS === 'ios' ? 58 : 20,
+      right: 16,
+      backgroundColor: c.overlayLight,
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 12,
+      paddingVertical: 7,
+      borderRadius: 16,
+      gap: 6,
+    },
+    legendDot: {
+      width: 12,
+      height: 12,
+      borderRadius: 6,
+      backgroundColor: 'rgba(255,69,58,0.7)',
+      borderWidth: 1.5,
+      borderColor: '#FF453A',
+    },
+    legendTxt: { color: '#fff', fontSize: 11 },
+    panel: {
+      backgroundColor: c.card,
+      borderTopLeftRadius: 22,
+      borderTopRightRadius: 22,
+      marginTop: -22,
+      padding: 16,
+      paddingBottom: Platform.OS === 'ios' ? 36 : 16,
+    },
+    tabScroll: { marginBottom: 12 },
+    tab: {
+      paddingHorizontal: 16,
+      paddingVertical: 9,
+      borderRadius: 20,
+      backgroundColor: c.card2,
+      marginRight: 8,
+      alignItems: 'center',
+    },
+    tabOn:       { backgroundColor: c.accent },
+    tabLabel:    { color: c.textSub, fontSize: 13, fontWeight: '700' },
+    tabLabelOn:  { color: '#fff' },
+    tabSig:      { fontSize: 11, marginTop: 2 },
+    statsRow: {
+      flexDirection: 'row',
+      backgroundColor: c.card3,
+      borderRadius: 14,
+      padding: 14,
+      marginBottom: 12,
+    },
+    stat:    { flex: 1, alignItems: 'center' },
+    statVal: { color: c.text, fontSize: 20, fontWeight: '800' },
+    statLbl: { color: c.textMuted, fontSize: 11, marginTop: 3 },
+    divider: { width: 1, backgroundColor: c.divider, marginHorizontal: 4 },
+    bonus: {
+      color: c.accent,
+      fontSize: 13,
+      textAlign: 'center',
+      marginBottom: 10,
+      fontWeight: '600',
+    },
+    startBtn: {
+      backgroundColor: c.accent,
+      borderRadius: 14,
+      paddingVertical: 16,
+      alignItems: 'center',
+    },
+    startBtnTxt: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  });
+}
