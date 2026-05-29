@@ -5,6 +5,7 @@ import {
   RefreshControl,
 } from 'react-native';
 import { UserProfile, Challenge, RunRecord, BattleRecord } from '../types';
+import TimePicker from '../components/TimePicker';
 import {
   getOpenChallenges, createChallenge, joinChallenge,
   cancelChallenge, leaveChallenge, getUserBattleHistory,
@@ -39,7 +40,7 @@ function formatScheduledAt(iso: string): string {
 
 function isStartable(iso: string): boolean {
   const diff = new Date(iso).getTime() - Date.now();
-  return diff <= 5 * 60 * 1000;
+  return diff <= 10 * 60 * 1000; // 10분 전부터 입장 가능
 }
 
 function timeUntil(iso: string): string {
@@ -65,8 +66,9 @@ export default function ChallengeScreen({ profile, onEnterBattle, onSetupProfile
   const [roomTitle, setRoomTitle]   = useState('');
   const [distanceKm, setDistanceKm] = useState(5);
   const [maxPart, setMaxPart]       = useState(4);
-  const [dateStr, setDateStr]       = useState('');
-  const [timeStr, setTimeStr]       = useState('');
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [selectedHour, setSelectedHour] = useState(7);
+  const [selectedMinute, setSelectedMinute] = useState(0);
   const [creating, setCreating]     = useState(false);
 
   const { colors } = useTheme();
@@ -117,12 +119,10 @@ export default function ChallengeScreen({ profile, onEnterBattle, onSetupProfile
       Alert.alert('입력 오류', '방제목을 입력해주세요.');
       return;
     }
-    if (!dateStr.match(/^\d{4}-\d{2}-\d{2}$/) || !timeStr.match(/^\d{2}:\d{2}$/)) {
-      Alert.alert('입력 오류', '날짜는 YYYY-MM-DD, 시간은 HH:MM 형식으로 입력해주세요.');
-      return;
-    }
-    const scheduledAt = new Date(`${dateStr}T${timeStr}:00`).toISOString();
-    if (new Date(scheduledAt).getTime() <= Date.now()) {
+    const d = new Date(selectedDate);
+    d.setHours(selectedHour, selectedMinute, 0, 0);
+    const scheduledAt = d.toISOString();
+    if (d.getTime() <= Date.now()) {
       Alert.alert('입력 오류', '시작 시간은 현재 시간 이후여야 합니다.');
       return;
     }
@@ -243,10 +243,10 @@ export default function ChallengeScreen({ profile, onEnterBattle, onSetupProfile
   function openCreate() {
     if (!requireProfile()) return;
     const d = new Date(Date.now() + 60 * 60 * 1000);
-    const pad = (n: number) => n.toString().padStart(2, '0');
     setRoomTitle('');
-    setDateStr(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`);
-    setTimeStr(`${pad(d.getHours())}:${pad(d.getMinutes())}`);
+    setSelectedDate(d);
+    setSelectedHour(d.getHours());
+    setSelectedMinute(Math.floor(d.getMinutes() / 5) * 5);
     setShowCreate(true);
   }
 
@@ -524,26 +524,40 @@ export default function ChallengeScreen({ profile, onEnterBattle, onSetupProfile
               ))}
             </View>
 
-            <Text style={s.fieldLabel}>날짜 (YYYY-MM-DD)</Text>
-            <TextInput
-              style={s.input}
-              value={dateStr}
-              onChangeText={setDateStr}
-              placeholder="2025-06-15"
-              placeholderTextColor={colors.textFaint}
-              keyboardType="numbers-and-punctuation"
-              maxLength={10}
-            />
+            <Text style={s.fieldLabel}>날짜</Text>
+            <View style={s.dateNav}>
+              <TouchableOpacity
+                style={s.dateNavBtn}
+                onPress={() => {
+                  const d = new Date(selectedDate);
+                  d.setDate(d.getDate() - 1);
+                  if (d.getTime() >= Date.now() - 86400000) setSelectedDate(d);
+                }}
+              >
+                <Text style={s.dateNavArrow}>‹</Text>
+              </TouchableOpacity>
+              <Text style={s.dateNavTxt}>
+                {selectedDate.getFullYear()}.{(selectedDate.getMonth() + 1).toString().padStart(2, '0')}.{selectedDate.getDate().toString().padStart(2, '0')}
+                {' '}
+                {['일', '월', '화', '수', '목', '금', '토'][selectedDate.getDay()]}
+              </Text>
+              <TouchableOpacity
+                style={s.dateNavBtn}
+                onPress={() => {
+                  const d = new Date(selectedDate);
+                  d.setDate(d.getDate() + 1);
+                  setSelectedDate(d);
+                }}
+              >
+                <Text style={s.dateNavArrow}>›</Text>
+              </TouchableOpacity>
+            </View>
 
-            <Text style={s.fieldLabel}>시간 (HH:MM)</Text>
-            <TextInput
-              style={s.input}
-              value={timeStr}
-              onChangeText={setTimeStr}
-              placeholder="07:00"
-              placeholderTextColor={colors.textFaint}
-              keyboardType="numbers-and-punctuation"
-              maxLength={5}
+            <Text style={s.fieldLabel}>시간</Text>
+            <TimePicker
+              hour={selectedHour}
+              minute={selectedMinute}
+              onChange={(h, m) => { setSelectedHour(h); setSelectedMinute(m); }}
             />
 
             <View style={s.modalBtns}>
@@ -757,6 +771,19 @@ function makeStyles(c: Colors) {
       fontSize: 16,
       marginTop: 4,
     },
+    dateNav: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      backgroundColor: c.card3,
+      borderRadius: 12,
+      marginTop: 4,
+      paddingVertical: 6,
+      paddingHorizontal: 4,
+    },
+    dateNavBtn: { paddingHorizontal: 14, paddingVertical: 6 },
+    dateNavArrow: { color: c.accent, fontSize: 26, fontWeight: '300', lineHeight: 32 },
+    dateNavTxt: { color: c.text, fontSize: 15, fontWeight: '600', textAlign: 'center' },
     modalBtns: { flexDirection: 'row', gap: 10, marginTop: 18 },
     cancelBtn: {
       flex: 1,
