@@ -5,6 +5,8 @@ import { RouteReview, RouteCandidate } from '../types';
 import { isNearPolyline } from '../utils/geoUtils';
 
 const ISSUE_PROXIMITY_M = 80;
+const COMPLAINT_PROXIMITY_M = 50;
+const COMPLAINT_LOOKBACK_MS = 30 * 86_400_000;
 
 const ISSUE_SEVERITY: Record<string, number> = {
   safety:   4,
@@ -93,4 +95,26 @@ export function scoreRouteWithReviews(
   }
 
   return penalty;
+}
+
+/**
+ * 최근 30일 이내 경로 50m 이내에 신고된 이슈 건수를 반환합니다.
+ * 10건 이상이면 해당 경로를 '불편사항 多' 경로로 표시하는 데 사용됩니다.
+ */
+export function countRecentComplaints(
+  candidate: RouteCandidate,
+  reviews: RouteReview[]
+): number {
+  const cutoff = Date.now() - COMPLAINT_LOOKBACK_MS;
+  let count = 0;
+  for (const review of reviews) {
+    if (!review.hasIssues) continue;
+    if (new Date(review.date).getTime() < cutoff) continue;
+    for (const issue of review.issues) {
+      if (isNearPolyline(issue.coord, candidate.polyline, COMPLAINT_PROXIMITY_M)) {
+        count++;
+      }
+    }
+  }
+  return count;
 }

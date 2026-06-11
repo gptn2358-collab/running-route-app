@@ -5,7 +5,7 @@ import {
   isNearPolyline,
   haversineDistance,
 } from '../utils/geoUtils';
-import { loadReviews, scoreRouteWithReviews } from './reviewService';
+import { loadReviews, scoreRouteWithReviews, countRecentComplaints } from './reviewService';
 // 서울시 보행등 전수 데이터 (13,917개, 2023-05-30 기준)
 // 형식: [lat, lon][]
 import seoulCrossings from '../../assets/seoulCrossings.json';
@@ -272,8 +272,17 @@ export async function generateBestRoutes(
     throw new Error('경로를 찾을 수 없습니다.\n인터넷 연결을 확인하고 다시 시도해주세요.');
   }
 
+  const COMPLAINT_THRESHOLD = 10;
+  finalCandidates = finalCandidates.map(c => ({
+    ...c,
+    hasComplaints: countRecentComplaints(c, reviews) >= COMPLAINT_THRESHOLD,
+  }));
+
   const PENALTY_WEIGHT = 0.6;
   finalCandidates.sort((a, b) => {
+    // 불편 신고 다수 경로는 항상 후순위
+    if (a.hasComplaints !== b.hasComplaints) return a.hasComplaints ? 1 : -1;
+
     const distDiff =
       Math.abs(a.distance - targetDistanceM) -
       Math.abs(b.distance - targetDistanceM);

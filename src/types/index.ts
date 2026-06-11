@@ -11,6 +11,7 @@ export interface RouteCandidate {
   duration: number;   // seconds (walking estimate, running will be faster)
   trafficSignals: number;
   trafficSignalLocations: Coordinate[];
+  hasComplaints?: boolean; // 최근 1개월 내 50m 이내 불편 신고 10건 이상
 }
 
 export interface RunSegment {

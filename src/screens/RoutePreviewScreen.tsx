@@ -112,6 +112,7 @@ export default function RoutePreviewScreen({ routes, start, onStart, onBack }: P
                 <Text style={[s.tabSig, { color: on ? '#fff' : signalColor(r.trafficSignals) }]}>
                   🚦 {r.trafficSignals}개
                 </Text>
+                {r.hasComplaints && <Text style={s.tabWarning}>⚠️</Text>}
               </TouchableOpacity>
             );
           })}
@@ -138,6 +139,12 @@ export default function RoutePreviewScreen({ routes, start, onStart, onBack }: P
 
         {route.trafficSignals === 0 && (
           <Text style={s.bonus}>✅ 신호등 없는 최적 경로!</Text>
+        )}
+
+        {route.hasComplaints && (
+          <View style={s.complaintBanner}>
+            <Text style={s.complaintTxt}>⚠️ 불편사항이 많이 접수된 경로에요!</Text>
+          </View>
         )}
 
         <TouchableOpacity style={s.startBtn} onPress={() => onStart(route)}>
@@ -229,5 +236,17 @@ function makeStyles(c: Colors) {
       alignItems: 'center',
     },
     startBtnTxt: { color: '#fff', fontSize: 16, fontWeight: '700' },
+
+    tabWarning: { fontSize: 10, marginTop: 1 },
+    complaintBanner: {
+      backgroundColor: 'rgba(255,149,0,0.13)',
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: '#FF9500',
+      padding: 10,
+      marginBottom: 10,
+      alignItems: 'center',
+    },
+    complaintTxt: { color: '#FF9500', fontSize: 13, fontWeight: '700' },
   });
 }
