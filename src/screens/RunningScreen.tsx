@@ -64,6 +64,7 @@ export default function RunningScreen({ route: initialRoute, start, onFinish }: 
 
   const prevPosRef    = useRef<Coordinate>(start);
   const prevTimeRef   = useRef<number>(Date.now());
+  const startedAtRef  = useRef<string>(new Date().toISOString());
   const pausedRef     = useRef(false);
   const posRef        = useRef<Coordinate>(start);
   const trailRef      = useRef<Coordinate[]>([start]);
@@ -357,6 +358,7 @@ export default function RunningScreen({ route: initialRoute, start, onFinish }: 
             trail: trailRef.current,
             routePolyline: currentRouteRef.current.polyline,
             segments: segmentsRef.current,
+            startedAt: startedAtRef.current,
           });
         },
       },

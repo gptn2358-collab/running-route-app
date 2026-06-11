@@ -27,6 +27,7 @@ export interface RunStats {
   trail: Coordinate[];    // actual GPS path taken
   routePolyline: Coordinate[]; // planned route polyline
   segments: RunSegment[]; // per-km pace breakdown
+  startedAt?: string;     // ISO — run start time
 }
 
 export interface UserProfile {
