@@ -3,7 +3,7 @@ import {
   View, Text, StyleSheet, ScrollView, Platform, ActivityIndicator,
   TouchableOpacity, TextInput, KeyboardAvoidingView, FlatList,
 } from 'react-native';
-import { RunRecord, RunSegment, UserProfile } from '../types';
+import { RunRecord, UserProfile } from '../types';
 import { getUserRunHistory, formatMonthLabel } from '../services/rankingService';
 import { sendAIMessage, ChatMessage } from '../services/aiService';
 import { useTheme } from '../context/ThemeContext';
@@ -101,7 +101,7 @@ function AiCoachTab({ profile, history }: AiCoachProps) {
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
   }, [sending]);
 
-  const recentSegments: RunSegment[] | undefined = undefined;
+  const recentSegments = history[0]?.segments;
 
   async function send(text: string) {
     if (!text.trim() || sending) return;

@@ -28,6 +28,7 @@ export interface RunStats {
   trail: Coordinate[];    // actual GPS path taken
   routePolyline: Coordinate[]; // planned route polyline
   segments: RunSegment[]; // per-km pace breakdown
+  startedAt?: string;     // ISO — run start time
 }
 
 export interface UserProfile {
@@ -46,6 +47,7 @@ export interface RunRecord {
   isOffRun: boolean;
   offRunCount: number;    // 이 런닝에서 공식 오프구간을 통과한 횟수
   submittedAt: string;    // ISO
+  segments?: RunSegment[]; // km별 구간 페이스 (AI 코치용)
 }
 
 export interface RankingEntry {

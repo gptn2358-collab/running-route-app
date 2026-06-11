@@ -134,6 +134,7 @@ function AppContent() {
         isOffRun:    review.hasIssues || review.rating <= 2,
         offRunCount,
         submittedAt: new Date().toISOString(),
+        segments:    runStats.segments.length > 0 ? runStats.segments : undefined,
       };
       submitRunRecord(record);
     }

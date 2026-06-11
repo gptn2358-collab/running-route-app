@@ -193,6 +193,58 @@ export async function getUserBattleHistory(userId: string): Promise<BattleRecord
   }
 }
 
+// ─── 대기실 ────────────────────────────────────────────────────
+
+export interface WaitingEntry {
+  userId: string;
+  nickname: string;
+  joinedAt: string;
+}
+
+export async function enterWaitingRoom(
+  challengeId: string,
+  profile: UserProfile,
+): Promise<void> {
+  if (!db) return;
+  try {
+    await setDoc(
+      doc(db, 'challenges', challengeId, 'waitingRoom', profile.id),
+      { userId: profile.id, nickname: profile.nickname, joinedAt: new Date().toISOString() },
+    );
+  } catch (e) {
+    console.warn('[challengeService] 대기실 입장 실패:', e);
+  }
+}
+
+export async function leaveWaitingRoom(
+  challengeId: string,
+  userId: string,
+): Promise<void> {
+  if (!db) return;
+  try {
+    await deleteDoc(doc(db, 'challenges', challengeId, 'waitingRoom', userId));
+  } catch (e) {
+    console.warn('[challengeService] 대기실 퇴장 실패:', e);
+  }
+}
+
+export function subscribeWaitingRoom(
+  challengeId: string,
+  onUpdate: (entries: WaitingEntry[]) => void,
+): () => void {
+  if (!db) return () => {};
+  return onSnapshot(
+    collection(db, 'challenges', challengeId, 'waitingRoom'),
+    snap => {
+      const entries = snap.docs
+        .map(d => d.data() as WaitingEntry)
+        .sort((a, b) => a.joinedAt.localeCompare(b.joinedAt));
+      onUpdate(entries);
+    },
+    err => console.warn('[challengeService] 대기실 구독 실패:', err),
+  );
+}
+
 // ─── 단일 대결 조회 ────────────────────────────────────────────
 
 export async function getChallenge(challengeId: string): Promise<Challenge | null> {
