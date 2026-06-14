@@ -63,6 +63,11 @@ export async function loadReviews(): Promise<RouteReview[]> {
   return loadLocalReviews();
 }
 
+export async function getReviewByRunId(runId: string): Promise<RouteReview | null> {
+  const all = await loadReviews();
+  return all.find(r => r.runId === runId) ?? null;
+}
+
 // ─── Penalty scoring ────────────────────────────────────────────
 
 /**

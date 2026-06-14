@@ -5,6 +5,13 @@ import {
 } from 'react-native';
 import { WebView } from 'react-native-webview';
 import * as Location from 'expo-location';
+import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
+import {
+  requestLocationPermissions,
+  startBackgroundLocation,
+  stopBackgroundLocation,
+  setLocationHandler,
+} from '../services/backgroundLocationService';
 import { UserProfile, Challenge, ChallengeProgress, RouteCandidate, Coordinate } from '../types';
 import {
   updateProgress, subscribeProgress, startChallenge, finishChallenge,
@@ -98,7 +105,7 @@ export default function BattleRunScreen({ challenge, profile, onFinish }: Props)
   const timerRef         = useRef<ReturnType<typeof setInterval> | null>(null);
   const progressRef      = useRef<ReturnType<typeof setInterval> | null>(null);
   const countdownRef     = useRef<ReturnType<typeof setInterval> | null>(null);
-  const locationSubRef   = useRef<Location.LocationSubscription | null>(null);
+  const locSubRef        = useRef<Location.LocationSubscription | null>(null);
   const unsubProgressRef = useRef<(() => void) | null>(null);
   const unsubWaitRef     = useRef<(() => void) | null>(null);
   const finished         = useRef(false);
@@ -246,6 +253,7 @@ export default function BattleRunScreen({ challenge, profile, onFinish }: Props)
       return;
     }
 
+    activateKeepAwakeAsync();
     await startChallenge(challenge.id);
 
     timerRef.current = setInterval(() => {
@@ -253,41 +261,55 @@ export default function BattleRunScreen({ challenge, profile, onFinish }: Props)
       setDurationS(durRef.current);
     }, 1000);
 
-    locationSubRef.current = await Location.watchPositionAsync(
-      { accuracy: Location.Accuracy.BestForNavigation, distanceInterval: 5 },
-      loc => {
-        const { latitude, longitude } = loc.coords;
-        if (lastCoordRef.current) {
-          const d = haversine(lastCoordRef.current.lat, lastCoordRef.current.lon, latitude, longitude);
-          if (d < 50) {
-            distRef.current += d;
-            setDistanceM(distRef.current);
-          }
-        }
-        lastCoordRef.current = { lat: latitude, lon: longitude };
-        trailRef.current.push([latitude, longitude]);
-        if (viewModeRef.current === 'map') {
-          mapWebRef.current?.injectJavaScript(
-            `updatePos(${latitude},${longitude},${JSON.stringify(trailRef.current)});true;`
-          );
-        }
-        // 첫 GPS 좌표 들어오면 추천 경로 한 번만 생성
-        if (!routeFetchedRef.current) {
-          routeFetchedRef.current = true;
-          fetchSuggestedRoute(latitude, longitude, challenge.distanceKm * 1000)
-            .then(pts => {
-              if (pts.length === 0) return;
-              suggestedRouteRef.current = pts;
-              if (viewModeRef.current === 'map') {
-                mapWebRef.current?.injectJavaScript(
-                  `updateRoute(${JSON.stringify(pts)});true;`
-                );
-              }
-            })
-            .catch(() => {});
+    function onLocation(loc: Location.LocationObject) {
+      const { latitude, longitude } = loc.coords;
+      if (lastCoordRef.current) {
+        const d = haversine(lastCoordRef.current.lat, lastCoordRef.current.lon, latitude, longitude);
+        if (d < 50) {
+          distRef.current += d;
+          setDistanceM(distRef.current);
         }
       }
+      lastCoordRef.current = { lat: latitude, lon: longitude };
+      trailRef.current.push([latitude, longitude]);
+      if (viewModeRef.current === 'map') {
+        mapWebRef.current?.injectJavaScript(
+          `updatePos(${latitude},${longitude},${JSON.stringify(trailRef.current)});true;`
+        );
+      }
+      // 첫 GPS 좌표 들어오면 추천 경로 한 번만 생성
+      if (!routeFetchedRef.current) {
+        routeFetchedRef.current = true;
+        fetchSuggestedRoute(latitude, longitude, challenge.distanceKm * 1000)
+          .then(pts => {
+            if (pts.length === 0) return;
+            suggestedRouteRef.current = pts;
+            if (viewModeRef.current === 'map') {
+              mapWebRef.current?.injectJavaScript(
+                `updateRoute(${JSON.stringify(pts)});true;`
+              );
+            }
+          })
+          .catch(() => {});
+      }
+    }
+
+    // 1) 포그라운드 GPS — 항상 시작
+    locSubRef.current = await Location.watchPositionAsync(
+      { accuracy: Location.Accuracy.BestForNavigation, distanceInterval: 5 },
+      onLocation,
     );
+
+    // 2) 배경 권한 있으면 백그라운드 추가 (화면 잠금 시 보조)
+    try {
+      const { status: bgStatus } = await Location.requestBackgroundPermissionsAsync();
+      if (bgStatus === 'granted') {
+        setLocationHandler(onLocation);
+        await startBackgroundLocation();
+      }
+    } catch {
+      // 실패해도 watchPositionAsync + keep-awake로 충분
+    }
 
     progressRef.current = setInterval(async () => {
       if (finished.current) return;
@@ -301,7 +323,10 @@ export default function BattleRunScreen({ challenge, profile, onFinish }: Props)
     finished.current = true;
     clearInterval(timerRef.current!);
     clearInterval(progressRef.current!);
-    locationSubRef.current?.remove();
+    deactivateKeepAwake();
+    locSubRef.current?.remove();
+    setLocationHandler(null);
+    stopBackgroundLocation().catch(() => {});
 
     await updateProgress(challenge.id, profile.id, profile.nickname, distRef.current, durRef.current, true);
     await finishChallenge(challenge.id);
@@ -335,7 +360,10 @@ export default function BattleRunScreen({ challenge, profile, onFinish }: Props)
           finished.current = true;
           clearInterval(timerRef.current!);
           clearInterval(progressRef.current!);
-          locationSubRef.current?.remove();
+          deactivateKeepAwake();
+          locSubRef.current?.remove();
+          setLocationHandler(null);
+          stopBackgroundLocation().catch(() => {});
           updateProgress(challenge.id, profile.id, profile.nickname, distRef.current, durRef.current, true);
           onFinish();
         },
@@ -348,7 +376,10 @@ export default function BattleRunScreen({ challenge, profile, onFinish }: Props)
       clearInterval(timerRef.current!);
       clearInterval(progressRef.current!);
       clearInterval(countdownRef.current!);
-      locationSubRef.current?.remove();
+      deactivateKeepAwake();
+      locSubRef.current?.remove();
+      setLocationHandler(null);
+      stopBackgroundLocation().catch(() => {});
       unsubProgressRef.current?.();
     };
   }, []);

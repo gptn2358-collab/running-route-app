@@ -3,11 +3,13 @@ import {
   View, Text, StyleSheet, ScrollView, Platform, ActivityIndicator,
   TouchableOpacity, TextInput, KeyboardAvoidingView, FlatList,
 } from 'react-native';
-import { RunRecord, UserProfile } from '../types';
+import { RunRecord, RouteReview, UserProfile } from '../types';
 import { getUserRunHistory, formatMonthLabel } from '../services/rankingService';
+import { getReviewByRunId } from '../services/reviewService';
 import { sendAIMessage, ChatMessage } from '../services/aiService';
 import { useTheme } from '../context/ThemeContext';
 import { Colors } from '../theme';
+import RunDetailScreen from './RunDetailScreen';
 
 interface Props {
   profile: UserProfile | null;
@@ -216,10 +218,12 @@ function AiCoachTab({ profile, history }: AiCoachProps) {
 // ── 메인 화면 ─────────────────────────────────────────────────────
 
 export default function RunHistoryScreen({ profile }: Props) {
-  const [groups, setGroups]   = useState<MonthGroup[]>([]);
-  const [history, setHistory] = useState<RunRecord[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [tab, setTab]         = useState<'records' | 'ai'>('records');
+  const [groups, setGroups]             = useState<MonthGroup[]>([]);
+  const [history, setHistory]           = useState<RunRecord[]>([]);
+  const [loading, setLoading]           = useState(true);
+  const [tab, setTab]                   = useState<'records' | 'ai'>('records');
+  const [selectedRecord, setSelectedRecord] = useState<RunRecord | null>(null);
+  const [selectedReview, setSelectedReview] = useState<RouteReview | null>(null);
 
   const { colors } = useTheme();
   const s = useMemo(() => makeStyles(colors), [colors]);
@@ -231,6 +235,17 @@ export default function RunHistoryScreen({ profile }: Props) {
       setLoading(false);
     });
   }, [profile]);
+
+  async function handleSelectRecord(record: RunRecord) {
+    const review = await getReviewByRunId(record.runId);
+    setSelectedReview(review);
+    setSelectedRecord(record);
+  }
+
+  function handleCloseDetail() {
+    setSelectedRecord(null);
+    setSelectedReview(null);
+  }
 
   const allTime = groups.reduce(
     (acc, g) => ({ km: acc.km + g.totalKm, runs: acc.runs + g.records.length }),
@@ -257,6 +272,12 @@ export default function RunHistoryScreen({ profile }: Props) {
           </TouchableOpacity>
         </View>
       </View>
+
+      <RunDetailScreen
+        record={selectedRecord}
+        review={selectedReview}
+        onClose={handleCloseDetail}
+      />
 
       {tab === 'ai' ? (
         <AiCoachTab profile={profile} history={history} />
@@ -317,9 +338,11 @@ export default function RunHistoryScreen({ profile }: Props) {
 
                 <View style={s.runList}>
                   {group.records.map((r, i) => (
-                    <View
+                    <TouchableOpacity
                       key={r.runId}
                       style={[s.runCard, i < group.records.length - 1 && s.runCardBorder]}
+                      onPress={() => handleSelectRecord(r)}
+                      activeOpacity={0.7}
                     >
                       <View style={s.runLeft}>
                         <View style={s.runDateRow}>
@@ -340,8 +363,9 @@ export default function RunHistoryScreen({ profile }: Props) {
                       <View style={s.runRight}>
                         <Text style={s.runKm}>{(r.distanceM / 1000).toFixed(2)}</Text>
                         <Text style={s.runKmUnit}>km</Text>
+                        <Text style={s.runChevron}>›</Text>
                       </View>
-                    </View>
+                    </TouchableOpacity>
                   ))}
                 </View>
               </View>
@@ -408,6 +432,7 @@ function makeStyles(c: Colors) {
     runRight:      { alignItems: 'flex-end' },
     runKm:         { color: c.accent, fontSize: 22, fontWeight: '800' },
     runKmUnit:     { color: c.textFaint, fontSize: 11 },
+    runChevron:    { color: c.textFaint, fontSize: 18, marginTop: 2 },
 
     empty:      { alignItems: 'center', paddingTop: 60, gap: 12 },
     emptyIcon:  { fontSize: 52 },

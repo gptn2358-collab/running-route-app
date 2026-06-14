@@ -109,6 +109,7 @@ export default function ReviewScreen({ trail, routeId, userId, runId, onReviewSu
       const review: RouteReview = {
         id: Date.now().toString(),
         routeId,
+        runId,
         date: new Date().toISOString(),
         trail,
         rating,

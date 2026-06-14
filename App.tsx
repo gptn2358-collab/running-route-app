@@ -135,6 +135,8 @@ function AppContent() {
         offRunCount,
         submittedAt: new Date().toISOString(),
         segments:    runStats.segments.length > 0 ? runStats.segments : undefined,
+        trail:       runStats.trail.length > 0 ? runStats.trail : undefined,
+        startedAt:   runStats.startedAt,
       };
       submitRunRecord(record);
     }

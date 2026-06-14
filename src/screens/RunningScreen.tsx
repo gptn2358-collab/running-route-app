@@ -9,6 +9,13 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import * as Location from 'expo-location';
+import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
+import {
+  requestLocationPermissions,
+  startBackgroundLocation,
+  stopBackgroundLocation,
+  setLocationHandler,
+} from '../services/backgroundLocationService';
 import { RouteCandidate, Coordinate, RunStats, RunSegment } from '../types';
 import { haversineDistance, distToPolyline, predictSignalPhase } from '../utils/geoUtils';
 import {
@@ -57,7 +64,7 @@ export default function RunningScreen({ route: initialRoute, start, onFinish }: 
   const s = useMemo(() => makeStyles(colors), [colors]);
 
   const leafletRef   = useRef<LeafletMapHandle>(null);
-  const locSub       = useRef<Location.LocationSubscription | null>(null);
+  const locSubRef    = useRef<Location.LocationSubscription | null>(null);
   const timerRef     = useRef<ReturnType<typeof setInterval> | null>(null);
   const spatTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const predTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -91,6 +98,7 @@ export default function RunningScreen({ route: initialRoute, start, onFinish }: 
     }));
 
   useEffect(() => {
+    activateKeepAwakeAsync();
     startGPS();
 
     timerRef.current = setInterval(() => {
@@ -120,7 +128,10 @@ export default function RunningScreen({ route: initialRoute, start, onFinish }: 
     }, 1000);
 
     return () => {
-      locSub.current?.remove();
+      deactivateKeepAwake();
+      locSubRef.current?.remove();
+      setLocationHandler(null);
+      stopBackgroundLocation().catch(() => {});
       if (timerRef.current)  clearInterval(timerRef.current);
       if (spatTimerRef.current) clearInterval(spatTimerRef.current);
       if (predTimerRef.current) clearInterval(predTimerRef.current);
@@ -230,79 +241,100 @@ export default function RunningScreen({ route: initialRoute, start, onFinish }: 
 
   // ── GPS ──────────────────────────────────────────────────────
   async function startGPS() {
-    locSub.current = await Location.watchPositionAsync(
-      { accuracy: Location.Accuracy.BestForNavigation, timeInterval: 1500, distanceInterval: 4 },
-      (loc) => {
-        if (pausedRef.current) return;
-        const newPos: Coordinate = {
-          latitude: loc.coords.latitude, longitude: loc.coords.longitude,
-        };
-        const delta = haversineDistance(prevPosRef.current, newPos);
-        if (delta < 3) return;
+    // 포그라운드 권한만 있어도 watchPositionAsync는 항상 작동
+    const { status } = await Location.requestForegroundPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('위치 권한 필요', 'GPS 추적을 위해 위치 권한이 필요합니다. 설정에서 허용해주세요.');
+      return;
+    }
 
-        // GPS 스파이크 필터: 이전 점과의 속도가 8 m/s(약 29 km/h)를 초과하면 오류 신호로 버림
-        const now = loc.timestamp ?? Date.now();
-        const dtSec = (now - prevTimeRef.current) / 1000;
-        if (dtSec > 0 && delta / dtSec > 8) return;
-        prevTimeRef.current = now;
+    function handleLocation(loc: Location.LocationObject) {
+      if (pausedRef.current) return;
+      const newPos: Coordinate = {
+        latitude: loc.coords.latitude, longitude: loc.coords.longitude,
+      };
+      const delta = haversineDistance(prevPosRef.current, newPos);
+      if (delta < 3) return;
 
-        prevPosRef.current = newPos;
-        posRef.current     = newPos;
-        const newTrail = [...trailRef.current, newPos];
-        trailRef.current = newTrail;
-        const newCovered = coveredMRef.current + delta;
-        coveredMRef.current = newCovered;
-        setCoveredM(newCovered);
+      // GPS 스파이크 필터: 이전 점과의 속도가 8 m/s(약 29 km/h)를 초과하면 오류 신호로 버림
+      const now = loc.timestamp ?? Date.now();
+      const dtSec = (now - prevTimeRef.current) / 1000;
+      if (dtSec > 0 && delta / dtSec > 8) return;
+      prevTimeRef.current = now;
 
-        const completedKm = Math.floor(newCovered / 1000);
-        if (completedKm > lastSegKmRef.current) {
-          for (let km = lastSegKmRef.current + 1; km <= completedKm; km++) {
-            const prevSeg = segmentsRef.current[segmentsRef.current.length - 1];
-            const prevDistM = prevSeg ? prevSeg.cumulativeDistanceM : 0;
-            const prevDurS  = prevSeg ? prevSeg.cumulativeDurationS  : 0;
-            const segDistM  = newCovered - prevDistM;
-            const segDurS   = elapsedRef.current - prevDurS;
-            const pace      = segDistM > 0 ? (segDurS / segDistM) * 1000 : 0;
-            segmentsRef.current = [...segmentsRef.current, {
-              km,
-              cumulativeDistanceM: newCovered,
-              cumulativeDurationS: elapsedRef.current,
-              paceSecPerKm: Math.round(pace),
-            }];
-          }
-          lastSegKmRef.current = completedKm;
+      prevPosRef.current = newPos;
+      posRef.current     = newPos;
+      const newTrail = [...trailRef.current, newPos];
+      trailRef.current = newTrail;
+      const newCovered = coveredMRef.current + delta;
+      coveredMRef.current = newCovered;
+      setCoveredM(newCovered);
+
+      const completedKm = Math.floor(newCovered / 1000);
+      if (completedKm > lastSegKmRef.current) {
+        for (let km = lastSegKmRef.current + 1; km <= completedKm; km++) {
+          const prevSeg = segmentsRef.current[segmentsRef.current.length - 1];
+          const prevDistM = prevSeg ? prevSeg.cumulativeDistanceM : 0;
+          const prevDurS  = prevSeg ? prevSeg.cumulativeDurationS  : 0;
+          const segDistM  = newCovered - prevDistM;
+          const segDurS   = elapsedRef.current - prevDurS;
+          const pace      = segDistM > 0 ? (segDurS / segDistM) * 1000 : 0;
+          segmentsRef.current = [...segmentsRef.current, {
+            km,
+            cumulativeDistanceM: newCovered,
+            cumulativeDurationS: elapsedRef.current,
+            paceSecPerKm: Math.round(pace),
+          }];
         }
-
-        leafletRef.current?.updateRunner(newPos, newTrail);
-        updateNearSignal(newPos, spatRecordsRef.current);
-
-        if (bathroomModeRef.current && bathroomDestRef.current) {
-          const d = haversineDistance(newPos, bathroomDestRef.current);
-          setBathroomDist(Math.round(d));
-          if (d < 30) {
-            setBathroomMode(false);
-            bathroomModeRef.current = false;
-            bathroomDestRef.current = null;
-            setBathroomDist(null);
-            leafletRef.current?.clearBathroom();
-            Alert.alert('🚻 도착', '화장실에 도착했습니다!', [{ text: '확인' }]);
-          }
-          return;
-        }
-
-        const distFromRoute = distToPolyline(newPos, currentRouteRef.current.polyline);
-        if (distFromRoute > DEVIATION_THRESHOLD_M) {
-          if (offRouteSinceRef.current === null) {
-            offRouteSinceRef.current = Date.now();
-          } else if (Date.now() - offRouteSinceRef.current >= DEVIATION_TRIGGER_MS) {
-            offRouteSinceRef.current = null;
-            reroute('deviation');
-          }
-        } else {
-          offRouteSinceRef.current = null;
-        }
+        lastSegKmRef.current = completedKm;
       }
+
+      leafletRef.current?.updateRunner(newPos, newTrail);
+      updateNearSignal(newPos, spatRecordsRef.current);
+
+      if (bathroomModeRef.current && bathroomDestRef.current) {
+        const d = haversineDistance(newPos, bathroomDestRef.current);
+        setBathroomDist(Math.round(d));
+        if (d < 30) {
+          setBathroomMode(false);
+          bathroomModeRef.current = false;
+          bathroomDestRef.current = null;
+          setBathroomDist(null);
+          leafletRef.current?.clearBathroom();
+          Alert.alert('🚻 도착', '화장실에 도착했습니다!', [{ text: '확인' }]);
+        }
+        return;
+      }
+
+      const distFromRoute = distToPolyline(newPos, currentRouteRef.current.polyline);
+      if (distFromRoute > DEVIATION_THRESHOLD_M) {
+        if (offRouteSinceRef.current === null) {
+          offRouteSinceRef.current = Date.now();
+        } else if (Date.now() - offRouteSinceRef.current >= DEVIATION_TRIGGER_MS) {
+          offRouteSinceRef.current = null;
+          reroute('deviation');
+        }
+      } else {
+        offRouteSinceRef.current = null;
+      }
+    }
+
+    // 1) 포그라운드 GPS — 항상 시작 (keep-awake로 화면 유지 중에는 끊기지 않음)
+    locSubRef.current = await Location.watchPositionAsync(
+      { accuracy: Location.Accuracy.BestForNavigation, timeInterval: 1500, distanceInterval: 4 },
+      handleLocation,
     );
+
+    // 2) 배경 권한이 있으면 백그라운드 추적도 추가 (화면 잠금 시 보조)
+    try {
+      const { status: bgStatus } = await Location.requestBackgroundPermissionsAsync();
+      if (bgStatus === 'granted') {
+        setLocationHandler(handleLocation);
+        await startBackgroundLocation();
+      }
+    } catch {
+      // 백그라운드 실패해도 watchPositionAsync + keep-awake로 충분
+    }
   }
 
   async function handleBathroom() {
@@ -349,7 +381,10 @@ export default function RunningScreen({ route: initialRoute, start, onFinish }: 
         text: '종료',
         style: 'destructive',
         onPress: () => {
-          locSub.current?.remove();
+          deactivateKeepAwake();
+          locSubRef.current?.remove();
+          setLocationHandler(null);
+          stopBackgroundLocation().catch(() => {});
           if (timerRef.current) clearInterval(timerRef.current);
           onFinish({
             id: Date.now().toString(),

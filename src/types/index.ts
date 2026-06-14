@@ -48,6 +48,8 @@ export interface RunRecord {
   offRunCount: number;    // 이 런닝에서 공식 오프구간을 통과한 횟수
   submittedAt: string;    // ISO
   segments?: RunSegment[]; // km별 구간 페이스 (AI 코치용)
+  trail?: Coordinate[];   // GPS 경로 (지도 표시용)
+  startedAt?: string;     // ISO — 달리기 시작 시각
 }
 
 export interface RankingEntry {
@@ -87,6 +89,7 @@ export interface SavedRoute {
 export interface RouteReview {
   id: string;
   routeId: string;   // references SavedRoute.id
+  runId?: string;    // references RunRecord.runId
   date: string; // ISO string
   trail: Coordinate[];
   rating: number; // 1–5

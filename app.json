@@ -15,7 +15,8 @@
       "bundleIdentifier": "com.yourname.runningrouteapp",
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "달리기 경로 탐색 및 GPS 트래킹을 위해 위치 정보가 필요합니다.",
-        "NSLocationAlwaysAndWhenInUseUsageDescription": "달리는 동안 경로 트래킹을 위해 위치 정보가 필요합니다.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "달리는 동안 화면이 꺼져도 경로 트래킹을 유지하기 위해 항상 위치 권한이 필요합니다.",
+        "UIBackgroundModes": ["location"],
         "NSAppTransportSecurity": {
           "NSExceptionDomains": {
             "t-data.seoul.go.kr": {
