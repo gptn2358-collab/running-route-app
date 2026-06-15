@@ -103,8 +103,6 @@ function AiCoachTab({ profile, history }: AiCoachProps) {
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
   }, [sending]);
 
-  const recentSegments = history[0]?.segments;
-
   async function send(text: string) {
     if (!text.trim() || sending) return;
     const userMsg: ChatMessage = { role: 'user', content: text.trim() };
@@ -113,7 +111,7 @@ function AiCoachTab({ profile, history }: AiCoachProps) {
     setInput('');
     setSending(true);
     try {
-      const reply = await sendAIMessage(next, profile, history, recentSegments);
+      const reply = await sendAIMessage(next, profile, history);
       setMessages(prev => [...prev, { role: 'assistant', content: reply }]);
     } catch (e: any) {
       setMessages(prev => [...prev, {

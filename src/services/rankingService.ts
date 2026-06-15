@@ -52,9 +52,9 @@ export async function getUserRunHistory(userId: string): Promise<RunRecord[]> {
 
 // ─── 기록 제출 ────────────────────────────────────────────────────
 
-export async function submitRunRecord(record: RunRecord): Promise<void> {
+export async function submitRunRecord(record: RunRecord, pushToCloud = true): Promise<void> {
   await saveLocalRecord(record);
-  if (db) {
+  if (pushToCloud && db) {
     try {
       await setDoc(doc(db, 'run_records', record.runId), record);
     } catch (e) {

@@ -1,6 +1,6 @@
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../config/firebase';
-import { RunRecord, RunSegment, UserProfile } from '../types';
+import { RunRecord, UserProfile } from '../types';
 
 export interface ChatMessage {
   role: 'user' | 'assistant';
@@ -76,10 +76,15 @@ async function loadAIConfig(): Promise<{ key: string; model: string }> {
   return { key: cachedKey, model: cachedModel };
 }
 
+function fmtPace(secPerKm: number): string {
+  const m = Math.floor(secPerKm / 60);
+  const s = Math.round(secPerKm % 60);
+  return `${m}'${String(s).padStart(2, '0')}"`;
+}
+
 function buildUserContext(
   profile: UserProfile | null,
   history: RunRecord[],
-  recentSegments?: RunSegment[],
 ): string {
   const lines: string[] = ['[사용자 러닝 데이터]'];
 
@@ -94,43 +99,69 @@ function buildUserContext(
 
   const totalKm = history.reduce((s, r) => s + r.distanceM, 0) / 1000;
   const avgKm = totalKm / history.length;
-  const avgPaceSec = history
-    .filter(r => r.durationS > 0 && r.distanceM > 0)
-    .reduce((s, r) => s + (r.durationS / r.distanceM) * 1000, 0) / history.length;
+  const paceRecords = history.filter(r => r.durationS > 0 && r.distanceM > 0);
+  const avgPaceSec = paceRecords.length > 0
+    ? paceRecords.reduce((s, r) => s + (r.durationS / r.distanceM) * 1000, 0) / paceRecords.length
+    : 0;
 
   lines.push(`총 달리기 횟수: ${history.length}회`);
   lines.push(`누적 거리: ${totalKm.toFixed(1)}km`);
   lines.push(`평균 거리: ${avgKm.toFixed(2)}km`);
-
   if (avgPaceSec > 0 && isFinite(avgPaceSec)) {
-    const m = Math.floor(avgPaceSec / 60);
-    const s = Math.round(avgPaceSec % 60);
-    lines.push(`평균 페이스: ${m}'${String(s).padStart(2, '0')}"/km`);
+    lines.push(`전체 평균 페이스: ${fmtPace(avgPaceSec)}/km`);
   }
 
-  const sortedHistory = [...history].sort((a, b) => b.submittedAt.localeCompare(a.submittedAt));
-  const recent = sortedHistory.slice(0, 5);
-  if (recent.length > 0) {
-    lines.push('\n[최근 기록]');
-    for (const r of recent) {
-      const d = new Date(r.submittedAt);
-      const dateStr = `${d.getMonth() + 1}/${d.getDate()}`;
-      const km = (r.distanceM / 1000).toFixed(2);
-      let paceStr = '-';
-      if (r.durationS > 0 && r.distanceM > 0) {
-        const sec = (r.durationS / r.distanceM) * 1000;
-        paceStr = `${Math.floor(sec / 60)}'${Math.round(sec % 60).toString().padStart(2, '0')}"`;
+  // 최근 5회 기록 + 구간 페이스 상세
+  const sorted = [...history].sort((a, b) => b.submittedAt.localeCompare(a.submittedAt));
+  const recent5 = sorted.slice(0, 5);
+
+  lines.push('\n[최근 달리기 상세]');
+  for (const r of recent5) {
+    const d = new Date(r.submittedAt);
+    const dateStr = `${d.getMonth() + 1}/${d.getDate()}`;
+    const km = (r.distanceM / 1000).toFixed(2);
+    let paceStr = '-';
+    if (r.durationS > 0 && r.distanceM > 0) {
+      paceStr = `${fmtPace((r.durationS / r.distanceM) * 1000)}/km`;
+    }
+    lines.push(`  ${dateStr}: ${km}km, 평균 페이스 ${paceStr}`);
+
+    if (r.segments && r.segments.length > 0) {
+      const segStr = r.segments.map(seg => `${seg.km}km: ${fmtPace(seg.paceSecPerKm)}`).join(' → ');
+      lines.push(`    └ 구간 페이스: ${segStr}`);
+
+      // 전반부/후반부 비교로 스플릿 분석
+      if (r.segments.length >= 2) {
+        const half = Math.floor(r.segments.length / 2);
+        const firstAvg = r.segments.slice(0, half).reduce((s, g) => s + g.paceSecPerKm, 0) / half;
+        const secondAvg = r.segments.slice(half).reduce((s, g) => s + g.paceSecPerKm, 0) / (r.segments.length - half);
+        const diff = firstAvg - secondAvg; // 양수 = 후반 더 빠름
+        if (Math.abs(diff) >= 15) {
+          lines.push(`    └ 스플릿: ${diff > 0 ? '후반 가속 (네거티브 스플릿)' : '후반 페이스 저하'} (${Math.abs(Math.round(diff))}초/km 차이)`);
+        } else {
+          lines.push(`    └ 스플릿: 전반/후반 페이스 균일`);
+        }
       }
-      lines.push(`  ${dateStr}: ${km}km (페이스 ${paceStr}/km)`);
     }
   }
 
-  if (recentSegments && recentSegments.length > 0) {
-    lines.push('\n[최근 달리기 구간 페이스]');
-    for (const seg of recentSegments) {
-      const m = Math.floor(seg.paceSecPerKm / 60);
-      const s = Math.round(seg.paceSecPerKm % 60);
-      lines.push(`  ${seg.km}km 구간: ${m}'${String(s).padStart(2, '0')}"/km`);
+  // 페이스 추이 분석 (3회 이상일 때)
+  if (paceRecords.length >= 3) {
+    const recentPaces = sorted
+      .filter(r => r.durationS > 0 && r.distanceM > 0)
+      .slice(0, 6)
+      .map(r => (r.durationS / r.distanceM) * 1000);
+
+    if (recentPaces.length >= 3) {
+      const mid = Math.ceil(recentPaces.length / 2);
+      const newerAvg = recentPaces.slice(0, mid).reduce((s, p) => s + p, 0) / mid;
+      const olderAvg = recentPaces.slice(mid).reduce((s, p) => s + p, 0) / (recentPaces.length - mid);
+      const diff = olderAvg - newerAvg; // 양수 = 최근이 더 빠름
+      if (Math.abs(diff) >= 10) {
+        lines.push(`\n[페이스 추이] 최근 달리기가 이전 대비 ${Math.abs(Math.round(diff))}초/km ${diff > 0 ? '빨라지는 추세' : '느려지는 추세'}`);
+      } else {
+        lines.push('\n[페이스 추이] 페이스가 안정적으로 유지되고 있음');
+      }
     }
   }
 
@@ -182,11 +213,10 @@ export async function sendAIMessage(
   messages: ChatMessage[],
   profile: UserProfile | null,
   history: RunRecord[],
-  recentSegments?: RunSegment[],
 ): Promise<string> {
   const { key, model } = await loadAIConfig();
 
-  const userContext = buildUserContext(profile, history, recentSegments);
+  const userContext = buildUserContext(profile, history);
   const systemWithContext = `${SYSTEM_PROMPT}\n\n${userContext}`;
 
   const response = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {

@@ -120,10 +120,13 @@ function AppContent() {
   // ── 리뷰 제출 → 기록 저장 → 요약 화면 ──────────────────────────
 
   async function handleReviewSubmitted(review: RouteReview) {
-    if (profile?.optedInRanking && runStats) {
-      const offZones = await getActiveOffZones();
-      const offRunCount = countOffZonesOnRoute(runStats.routePolyline, offZones);
-
+    if (profile && runStats) {
+      const isOptedIn = profile.optedInRanking;
+      let offRunCount = 0;
+      if (isOptedIn) {
+        const offZones = await getActiveOffZones();
+        offRunCount = countOffZonesOnRoute(runStats.routePolyline, offZones);
+      }
       const record: RunRecord = {
         runId:       runStats.id,
         userId:      profile.id,
@@ -131,14 +134,14 @@ function AppContent() {
         month:       getMonthKey(),
         distanceM:   runStats.distance,
         durationS:   runStats.duration,
-        isOffRun:    review.hasIssues || review.rating <= 2,
+        isOffRun:    isOptedIn && (review.hasIssues || review.rating <= 2),
         offRunCount,
         submittedAt: new Date().toISOString(),
         segments:    runStats.segments.length > 0 ? runStats.segments : undefined,
         trail:       runStats.trail.length > 0 ? runStats.trail : undefined,
         startedAt:   runStats.startedAt,
       };
-      submitRunRecord(record);
+      submitRunRecord(record, isOptedIn);
     }
     setRunFlow('summary');
   }
